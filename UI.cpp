@@ -1,13 +1,37 @@
 #include "UI.h"
+#include "fc2.hpp"
 #include "Drawing.h"
+#include "uiaccess.h"
+#include <chrono>
 
 ID3D11Device* UI::pd3dDevice = nullptr;
 ID3D11DeviceContext* UI::pd3dDeviceContext = nullptr;
 IDXGISwapChain* UI::pSwapChain = nullptr;
 ID3D11RenderTargetView* UI::pMainRenderTargetView = nullptr;
+HWND UI::hTargetWindow = nullptr;
+DWORD UI::dTargetPID = 0;
+std::chrono::microseconds max_lag_buffer{ 0 };
+std::chrono::microseconds target_frametime{ 4000 };
+const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-HMODULE UI::hCurrentModule = nullptr;
+// relevant ZBIDs
+enum ZBID
+{
+    ZBID_DEFAULT = 0,
+    ZBID_DESKTOP = 1,
+    ZBID_UIACCESS = 2
+};
 
+// undocumented WinAPI function to create windows in specified band
+typedef HWND(WINAPI* CreateWindowInBand)(_In_ DWORD dwExStyle, _In_opt_ LPCWSTR atom, _In_opt_ LPCWSTR lpWindowName, _In_ DWORD dwStyle, _In_ int X, _In_ int Y, _In_ int nWidth, _In_ int nHeight, _In_opt_ HWND hWndParent, _In_opt_ HMENU hMenu, _In_opt_ HINSTANCE hInstance, _In_opt_ LPVOID lpParam, DWORD band);
+
+CreateWindowInBand pCreateWindowInBand = reinterpret_cast<CreateWindowInBand>(GetProcAddress(LoadLibraryA("user32.dll"), "CreateWindowInBand"));
+
+/**
+ * @brief Create a D3D11 device
+ * @param hWnd handle to the overlay window
+ * @return true if the device has been created, otherwise false
+ */
 bool UI::CreateDeviceD3D(HWND hWnd)
 {
     // Setup swap chain
@@ -40,6 +64,9 @@ bool UI::CreateDeviceD3D(HWND hWnd)
     return true;
 }
 
+/**
+ * @brief Create the render target
+ */
 void UI::CreateRenderTarget()
 {
     ID3D11Texture2D* pBackBuffer;
@@ -51,11 +78,17 @@ void UI::CreateRenderTarget()
     }
 }
 
+/**
+ * @brief Release the render target
+ */
 void UI::CleanupRenderTarget()
 {
     if (pMainRenderTargetView) { pMainRenderTargetView->Release(); pMainRenderTargetView = nullptr; }
 }
 
+/**
+ * @brief Release the D3D11 device
+ */
 void UI::CleanupDeviceD3D()
 {
     CleanupRenderTarget();
@@ -68,6 +101,10 @@ void UI::CleanupDeviceD3D()
 #define WM_DPICHANGED 0x02E0 // From Windows SDK 8.1+ headers
 #endif
 
+/**
+ * @brief Callback function that processes messages sent to a window
+ * https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wndproc
+ */
 LRESULT WINAPI UI::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
@@ -107,12 +144,29 @@ LRESULT WINAPI UI::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     return ::DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+/**
+ * @brief Create overlay window and enter main loop
+ */
 void UI::Render()
 {
+    // get UIAccess
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    DWORD dwErr = PrepareForUIAccess();
+    //DWORD dwErr = ERROR_NOT_FOUND;
+
     ImGui_ImplWin32_EnableDpiAwareness();
-    const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, _T("FC2Toverlay"), nullptr };
+    const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, _T("FC2Toverlay"), nullptr };
     ::RegisterClassEx(&wc);
-    const HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("FC2Toverlay"), WS_OVERLAPPEDWINDOW, 100, 100, 50, 50, NULL, NULL, wc.hInstance, NULL);
+
+    DWORD band = dwErr == ERROR_SUCCESS ? ZBID_UIACCESS : ZBID_DESKTOP;
+    const HWND hwnd = pCreateWindowInBand(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
+
+    // set display affinity to hide the window in screen captures
+    //SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+
+    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+    const MARGINS margin = { -1, 0, 0, 0 };
+    DwmExtendFrameIntoClientArea(hwnd, &margin);
 
     if (!CreateDeviceD3D(hwnd))
     {
@@ -121,23 +175,18 @@ void UI::Render()
         return;
     }
 
-    ::ShowWindow(hwnd, SW_HIDE);
+    ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ImGui::StyleColorsDark();
 
     ImGuiStyle& style = ImGui::GetStyle();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        style.WindowRounding = 4.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
+    style.WindowRounding = 4.0f;
 
     const HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
     MONITORINFO info = {};
@@ -145,25 +194,25 @@ void UI::Render()
     GetMonitorInfo(monitor, &info);
     const int monitor_height = info.rcMonitor.bottom - info.rcMonitor.top;
 
-    if (monitor_height > 1080)
+    /*if (monitor_height > 1080)
     {
         const float fScale = 2.0f;
         ImFontConfig cfg;
         cfg.SizePixels = 13 * fScale;
         ImGui::GetIO().Fonts->AddFontDefault(&cfg);
-    }
+    }*/
 
     ImGui::GetIO().IniFilename = nullptr;
 
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(pd3dDevice, pd3dDeviceContext);
 
-    const ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
     bool bDone = false;
 
     while (!bDone)
     {
+        auto frame_start = std::chrono::high_resolution_clock::now();
+
         MSG msg;
         while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
         {
@@ -176,21 +225,46 @@ void UI::Render()
         if (GetAsyncKeyState(VK_END) & 1)
             bDone = true;
 
+        if (fc2::get_error() != FC2_TEAM_ERROR_NO_ERROR)
+            bDone = true;
+
+        if (!IsWindowAlive())
+            bDone = true;
+
         if (bDone)
             break;
+
+        // Clear overlay when the targeted window is not focus
+        if (!IsWindowFocus(hwnd))
+        {
+            pd3dDeviceContext->OMSetRenderTargets(1, &pMainRenderTargetView, nullptr);
+            pd3dDeviceContext->ClearRenderTargetView(pMainRenderTargetView, clear_color);
+
+            pSwapChain->Present(4, 0);
+            Sleep(250);
+
+            continue;
+        }
+
+        // Move the overlay on top of the target window
+        MoveWindow(hwnd);
 
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         {
+            ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+            auto canvas = ImGui::GetBackgroundDrawList();
+            ImVec2 origin = ImVec2(0, 0);
+            canvas->AddRect(origin, displaySize, IM_COL32(255, 0, 0, 255), static_cast<float>(1));
+
             Drawing::Draw();
         }
         ImGui::EndFrame();
 
         ImGui::Render();
-        const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
         pd3dDeviceContext->OMSetRenderTargets(1, &pMainRenderTargetView, nullptr);
-        pd3dDeviceContext->ClearRenderTargetView(pMainRenderTargetView, clear_color_with_alpha);
+        pd3dDeviceContext->ClearRenderTargetView(pMainRenderTargetView, clear_color);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -199,10 +273,14 @@ void UI::Render()
             ImGui::RenderPlatformWindowsDefault();
         }
 
-        pSwapChain->Present(1, 0);
+        pSwapChain->Present(0, 0);
 
-        if (!Drawing::isActive())
-            break;
+        auto frame_end = std::chrono::high_resolution_clock::now();
+        auto frame_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start);
+
+        // TODO: sleep_for adds a 1ms (1000 microseconds) time by default. Take this into account and adjust delay accordingly
+        if (frame_time < target_frametime)
+            std::this_thread::sleep_for(std::chrono::microseconds(target_frametime - frame_time));
     }
 
     ImGui_ImplDX11_Shutdown();
@@ -212,4 +290,110 @@ void UI::Render()
     CleanupDeviceD3D();
     ::DestroyWindow(hwnd);
     ::UnregisterClass(wc.lpszClassName, wc.hInstance);
+}
+
+/**
+ * @brief Get the target window handle and save it
+ * @return true if the target window is valid and the handle was saved, otherwise false
+ */
+bool UI::SetTargetWindow()
+{
+    uint32_t iTargetHandle = fc2::call<uint32_t>("directx_overlay_target_handle", FC2_LUA_TYPE_INT);
+    if (iTargetHandle == 0)
+        return false;
+    uint32_t iTargetProcID = fc2::call<uint32_t>("directx_overlay_target_process_id", FC2_LUA_TYPE_INT);
+    if (iTargetProcID == 0)
+        return false;
+
+    HWND hWindow = (HWND)IntToPtr(iTargetHandle);
+    if (!IsWindow(hWindow))
+        return false;
+    hTargetWindow = hWindow;
+    GetWindowThreadProcessId(hTargetWindow, &dTargetPID);
+    return true;
+}
+
+/**
+ * @brief Check if the target window got closed
+ * @return TRUE if the window is still open, FALSE if it got closed
+ */
+BOOL UI::IsWindowAlive()
+{
+    DWORD dCurrentPID;
+
+    if (hTargetWindow == nullptr)
+        return FALSE;
+
+    if (!IsWindow(hTargetWindow))
+        return FALSE;
+
+    GetWindowThreadProcessId(hTargetWindow, &dCurrentPID);
+
+    if (dCurrentPID != dTargetPID)
+        return FALSE;
+
+    return TRUE;
+}
+
+/**
+ * @brief Check if the overlay window or the target window is in focus
+ * @param hCurrentProcessWindow Handle of the overlay window
+ * @return TRUE if one of the windows is in focus, otherwise FALSE
+ */
+BOOL UI::IsWindowFocus(const HWND hCurrentProcessWindow)
+{
+    char lpCurrentWindowUsedClass[125];
+    char lpCurrentWindowClass[125];
+    char lpOverlayWindowClass[125];
+
+    const HWND hCurrentWindowUsed = GetForegroundWindow();
+    if (GetClassNameA(hCurrentWindowUsed, lpCurrentWindowUsedClass, sizeof(lpCurrentWindowUsedClass)) == 0)
+        return FALSE;
+
+    if (GetClassNameA(hTargetWindow, lpCurrentWindowClass, sizeof(lpCurrentWindowClass)) == 0)
+        return FALSE;
+
+    if (GetClassNameA(hCurrentProcessWindow, lpOverlayWindowClass, sizeof(lpOverlayWindowClass)) == 0)
+        return FALSE;
+
+    if (strcmp(lpCurrentWindowUsedClass, lpCurrentWindowClass) != 0 && strcmp(lpCurrentWindowUsedClass, lpOverlayWindowClass) != 0)
+    {
+        SetWindowLong(hCurrentProcessWindow, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/**
+ * @brief Move the overlay window on top of the target window
+ * @param hCurrentProcessWindow Handle of the overlay window
+ */
+void UI::MoveWindow(const HWND hCurrentProcessWindow)
+{
+    // TODO: optimize this function
+
+    // 
+    /*if (hTargetWindow == nullptr)
+        return;
+
+    RECT client;
+    GetClientRect(hTargetWindow, &client);
+    if (!EqualRect(&targetClient, &client))
+    {
+        MapWindowPoints(hTargetWindow, NULL, (LPPOINT)&client, 2);
+
+        SetWindowPos(hCurrentProcessWindow, nullptr, client.left, client.top, client.right - client.left, client.bottom - client.top, SWP_SHOWWINDOW);
+    }
+
+    return;*/
+
+    RECT client2;
+    if (hTargetWindow == nullptr)
+        return;
+
+    GetClientRect(hTargetWindow, &client2);
+    MapWindowPoints(hTargetWindow, NULL, (LPPOINT)&client2, 2);
+
+    SetWindowPos(hCurrentProcessWindow, nullptr, client2.left, client2.top, client2.right - client2.left, client2.bottom - client2.top, SWP_SHOWWINDOW);
 }
