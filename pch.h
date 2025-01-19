@@ -10,6 +10,8 @@
 #include <vector>
 #include <TlHelp32.h>
 #include <iterator>
+#include <chrono>
+#include "fc2.hpp"
 #include "d3d11.h"
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_dx11.h"

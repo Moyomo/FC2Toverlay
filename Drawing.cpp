@@ -2,32 +2,45 @@
 #include "fc2.hpp"
 
 LPCSTR Drawing::lpWindowName = "Overlay Performance";
-ImVec2 Drawing::vWindowSize = { 350, 75 };
+ImVec2 Drawing::vWindowSize = { 300, 85 };
 
-void Drawing::Draw()
+void Drawing::Draw(BOOL bDebug)
 {
 	if (fc2::get_error() == FC2_TEAM_ERROR_NO_ERROR)
 	{
+		// get drawing requests from FC2
 		auto drawing = fc2::get_drawing();
 
+		// get the default font
+		ImFont* font = ImGui::GetIO().Fonts->Fonts[0];
+
+		// loop over the drawing requests
 		for (auto& i : drawing)
 		{
-			/**
-			 * @brief get drawing canvas. this will allow us to draw in the background
-			 */
+			// get drawing canvas to draw in the background
 			auto canvas = ImGui::GetBackgroundDrawList();
 
-			/**
-			 * @brief draw text. this would be better with ImGui::TextColored, but the current version of FC2KV does not support color text. once I add that, the example will be changed.
-			 */
+			// draw a drop shadow for the text and then the text itself on top of it
 			if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_TEXT)
 			{
-				ImGui::Text("%s", i.text);
+				canvas->AddText(
+					font,
+					13.0f,
+					ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT] + 1, i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP] + 1),
+					ImColor(0, 0, 0, static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA])),
+					i.text
+				);
+
+				canvas->AddText(
+					font,
+					13.0f,
+					ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]),
+					ImColor(static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA])),
+					i.text
+				);
 			}
 
-			/**
-			 * @brief draw line. nothing fancy going on here.
-			 */
+			// draw a line
 			else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_LINE)
 			{
 				canvas->AddLine(
@@ -38,9 +51,7 @@ void Drawing::Draw()
 				);
 			}
 
-			/**
-			 * @brief draw boxes. worth noting that in imgui, imvec2 wants floating values, yet the dimensions are long. these should be casted.
-			 */
+			// draw normal or filled boxes
 			else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX || i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX_FILLED)
 			{
 				const auto min = ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]);
@@ -49,22 +60,33 @@ void Drawing::Draw()
 
 				if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX)
 				{
-					canvas->AddRect(min, max, clr, static_cast<float>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]));
+					canvas->AddRect(min, max, clr, NULL, NULL, static_cast<float>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]));
 				}
 				else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX_FILLED)
 				{
-					canvas->AddRectFilled(min, max, clr, static_cast<float>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]));
+					canvas->AddRectFilled(min, max, clr);
 				}
 			}
 		}
 	}
 
-	ImGui::SetNextWindowSize(vWindowSize, ImGuiCond_Once);
-	ImGui::SetNextWindowBgAlpha(1.0f);
-	ImGui::Begin(lpWindowName);
+	if (bDebug)
 	{
-		ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-		ImGui::Text("Frametime: %.3f ms/frame", 1000.0f / ImGui::GetIO().Framerate);
+		// draw red rectangle around target window client
+		ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+		auto canvas = ImGui::GetBackgroundDrawList();
+		ImVec2 origin = ImVec2(0, 0);
+		canvas->AddRect(origin, displaySize, IM_COL32(255, 0, 0, 255));
+
+		// draw window with info about overlay performance
+		ImGui::SetNextWindowSize(vWindowSize, ImGuiCond_Once);
+		ImGui::SetNextWindowBgAlpha(1.0f);
+		ImGui::Begin(lpWindowName);
+		{
+			ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+			ImGui::Text("Frametime: %.3f ms/frame", 1000.0f / ImGui::GetIO().Framerate);
+			ImGui::Text("Display size - X: %.0f Y: %.0f", displaySize.x, displaySize.y);
+		}
+		ImGui::End();
 	}
-	ImGui::End();
 }

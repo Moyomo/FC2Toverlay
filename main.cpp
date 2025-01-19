@@ -1,5 +1,4 @@
 #include "UI.h"
-#include "fc2.hpp"
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nShowCmd)
 {
@@ -31,6 +30,9 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         );
         return -1;
     }
+
+    // load script settings
+    UI::GetConfigSettings();
 
     // create overlay
     UI::Render();

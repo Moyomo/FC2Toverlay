@@ -14,6 +14,10 @@ private:
 	static ID3D11RenderTargetView* pMainRenderTargetView;
 	static HWND hTargetWindow;
 	static DWORD dTargetPID;
+	static RECT targetClient;
+	static BOOL bStreamProof;
+	static std::chrono::microseconds targetFrametime;
+	static BOOL bDebug;
 
 	static bool CreateDeviceD3D(HWND hWnd);
 	static void CleanupDeviceD3D();
@@ -27,7 +31,7 @@ private:
 public:
 	static void Render();
 	static bool SetTargetWindow();
-
+	static void GetConfigSettings();
 };
 
 #endif

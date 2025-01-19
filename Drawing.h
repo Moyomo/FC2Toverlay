@@ -10,7 +10,7 @@ private:
 	static ImVec2 vWindowSize;
 
 public:
-	static void Draw();
+	static void Draw(BOOL bDebug);
 };
 
 #endif

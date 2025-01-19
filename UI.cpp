@@ -1,8 +1,6 @@
 #include "UI.h"
-#include "fc2.hpp"
 #include "Drawing.h"
 #include "uiaccess.h"
-#include <chrono>
 
 ID3D11Device* UI::pd3dDevice = nullptr;
 ID3D11DeviceContext* UI::pd3dDeviceContext = nullptr;
@@ -10,9 +8,13 @@ IDXGISwapChain* UI::pSwapChain = nullptr;
 ID3D11RenderTargetView* UI::pMainRenderTargetView = nullptr;
 HWND UI::hTargetWindow = nullptr;
 DWORD UI::dTargetPID = 0;
-std::chrono::microseconds max_lag_buffer{ 0 };
-std::chrono::microseconds target_frametime{ 4000 };
+RECT UI::targetClient = {};
+BOOL UI::bStreamProof = TRUE;
+BOOL UI::bDebug = FALSE;
+std::chrono::microseconds UI::targetFrametime{ 4000 };
 const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+const auto microsecond = std::chrono::microseconds(1);
+const auto millisecond = std::chrono::microseconds(1000);
 
 // relevant ZBIDs
 enum ZBID
@@ -149,25 +151,35 @@ LRESULT WINAPI UI::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
  */
 void UI::Render()
 {
-    // get UIAccess
+    // get UIAccess so we can draw on top of fullscreen windows
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     DWORD dwErr = PrepareForUIAccess();
     //DWORD dwErr = ERROR_NOT_FOUND;
 
+    // tell windows that our application is DPI aware to prevent automatic scaling
     ImGui_ImplWin32_EnableDpiAwareness();
+
+    // create window class for the overlay
     const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, _T("FC2Toverlay"), nullptr };
     ::RegisterClassEx(&wc);
 
+    // create window in highest z-order possible
     DWORD band = dwErr == ERROR_SUCCESS ? ZBID_UIACCESS : ZBID_DESKTOP;
-    const HWND hwnd = pCreateWindowInBand(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
+    const HWND hwnd = pCreateWindowInBand(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
 
     // set display affinity to hide the window in screen captures
-    //SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+    if (bStreamProof)
+        SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
 
+    // set window styles again because it can't be a layered window when setting the display affinity
+    SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+
+    // set window transparency
     SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
     const MARGINS margin = { -1, 0, 0, 0 };
     DwmExtendFrameIntoClientArea(hwnd, &margin);
 
+    // create D3D11 device
     if (!CreateDeviceD3D(hwnd))
     {
         CleanupDeviceD3D();
@@ -180,27 +192,6 @@ void UI::Render()
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-
-    ImGui::StyleColorsDark();
-
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 4.0f;
-
-    const HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO info = {};
-    info.cbSize = sizeof(MONITORINFO);
-    GetMonitorInfo(monitor, &info);
-    const int monitor_height = info.rcMonitor.bottom - info.rcMonitor.top;
-
-    /*if (monitor_height > 1080)
-    {
-        const float fScale = 2.0f;
-        ImFontConfig cfg;
-        cfg.SizePixels = 13 * fScale;
-        ImGui::GetIO().Fonts->AddFontDefault(&cfg);
-    }*/
 
     ImGui::GetIO().IniFilename = nullptr;
 
@@ -209,10 +200,13 @@ void UI::Render()
 
     bool bDone = false;
 
+    // overlay loop
     while (!bDone)
     {
+        // start timer for frametime calculations
         auto frame_start = std::chrono::high_resolution_clock::now();
 
+        // loop over window messages and check for quit message
         MSG msg;
         while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
         {
@@ -222,19 +216,22 @@ void UI::Render()
                 bDone = true;
         }
 
+        // check if the user pressed the exit key
         if (GetAsyncKeyState(VK_END) & 1)
             bDone = true;
 
+        // check for the last FC2 error message
         if (fc2::get_error() != FC2_TEAM_ERROR_NO_ERROR)
             bDone = true;
 
+        // check if the target window got closed
         if (!IsWindowAlive())
             bDone = true;
 
         if (bDone)
             break;
 
-        // Clear overlay when the targeted window is not focus
+        // clear overlay when the target window is not in focus
         if (!IsWindowFocus(hwnd))
         {
             pd3dDeviceContext->OMSetRenderTargets(1, &pMainRenderTargetView, nullptr);
@@ -246,19 +243,15 @@ void UI::Render()
             continue;
         }
 
-        // Move the overlay on top of the target window
+        // move the overlay on top of the target window
         MoveWindow(hwnd);
 
+        // create new frame and get drawing requests
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         {
-            ImVec2 displaySize = ImGui::GetIO().DisplaySize;
-            auto canvas = ImGui::GetBackgroundDrawList();
-            ImVec2 origin = ImVec2(0, 0);
-            canvas->AddRect(origin, displaySize, IM_COL32(255, 0, 0, 255), static_cast<float>(1));
-
-            Drawing::Draw();
+            Drawing::Draw(bDebug);
         }
         ImGui::EndFrame();
 
@@ -267,22 +260,21 @@ void UI::Render()
         pd3dDeviceContext->ClearRenderTargetView(pMainRenderTargetView, clear_color);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-        }
-
+        // present current frame on screen
         pSwapChain->Present(0, 0);
 
+        // calculate the time we have to wait for to achieve our target frametime
         auto frame_end = std::chrono::high_resolution_clock::now();
         auto frame_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start);
+        auto time_to_wait = targetFrametime - frame_time - millisecond;
+        if (time_to_wait < microsecond)
+            time_to_wait = microsecond;
 
-        // TODO: sleep_for adds a 1ms (1000 microseconds) time by default. Take this into account and adjust delay accordingly
-        if (frame_time < target_frametime)
-            std::this_thread::sleep_for(std::chrono::microseconds(target_frametime - frame_time));
+        // NOTE: sleeping adds at least 1ms of waiting time by default
+        std::this_thread::sleep_for(time_to_wait);
     }
 
+    // cleanup and shutdown
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
@@ -371,10 +363,7 @@ BOOL UI::IsWindowFocus(const HWND hCurrentProcessWindow)
  */
 void UI::MoveWindow(const HWND hCurrentProcessWindow)
 {
-    // TODO: optimize this function
-
-    // 
-    /*if (hTargetWindow == nullptr)
+    if (hTargetWindow == nullptr)
         return;
 
     RECT client;
@@ -385,15 +374,15 @@ void UI::MoveWindow(const HWND hCurrentProcessWindow)
 
         SetWindowPos(hCurrentProcessWindow, nullptr, client.left, client.top, client.right - client.left, client.bottom - client.top, SWP_SHOWWINDOW);
     }
+}
 
-    return;*/
-
-    RECT client2;
-    if (hTargetWindow == nullptr)
-        return;
-
-    GetClientRect(hTargetWindow, &client2);
-    MapWindowPoints(hTargetWindow, NULL, (LPPOINT)&client2, 2);
-
-    SetWindowPos(hCurrentProcessWindow, nullptr, client2.left, client2.top, client2.right - client2.left, client2.bottom - client2.top, SWP_SHOWWINDOW);
+/**
+ * @brief Get the Lua script settings from FC2
+ */
+void UI::GetConfigSettings()
+{
+    bStreamProof = fc2::call<BOOL>("directx_overlay_streamproof", FC2_LUA_TYPE_BOOLEAN);
+    bDebug = fc2::call<BOOL>("directx_overlay_debug", FC2_LUA_TYPE_BOOLEAN);
+    uint32_t iTargetFrametime = 1000000 / fc2::call<uint32_t>("directx_overlay_target_fps", FC2_LUA_TYPE_INT);
+    targetFrametime = std::chrono::microseconds(iTargetFrametime);
 }
