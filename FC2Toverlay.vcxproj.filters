@@ -45,7 +45,7 @@
     <ClCompile Include="Drawing.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="uiaccess.c">
+    <ClCompile Include="uiaccess.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

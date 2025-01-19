@@ -1,8 +1,8 @@
 #ifndef UIACCESS_H
 #define UIACCESS_H
 
-#include <windows.h>
+#include "pch.h"
 
-EXTERN_C DWORD PrepareForUIAccess();
+DWORD PrepareForUIAccess();
 
 #endif

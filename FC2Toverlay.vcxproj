@@ -146,7 +146,7 @@
     <ClCompile Include="ImGui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="UI.cpp" />
-    <ClCompile Include="uiaccess.c" />
+    <ClCompile Include="uiaccess.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Drawing.h" />

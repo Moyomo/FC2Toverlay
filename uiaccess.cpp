@@ -1,6 +1,4 @@
 #include "uiaccess.h"
-#include <tlhelp32.h>
-#include <tchar.h>
 
 static DWORD DuplicateWinloginToken(DWORD dwSessionId, DWORD dwDesiredAccess, PHANDLE phToken) {
 	DWORD dwErr;
@@ -111,7 +109,7 @@ static DWORD CreateUIAccessToken(PHANDLE phToken) {
 	return dwErr;
 }
 
-static BOOL CheckForUIAccess(DWORD* pdwErr, DWORD* pfUIAccess) {
+static BOOL CheckForUIAccess(DWORD* pdwErr, BOOL* pfUIAccess) {
 	BOOL result = FALSE;
 	HANDLE hToken;
 
