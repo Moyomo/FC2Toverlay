@@ -1,7 +1,7 @@
-#ifndef DRAWING_H
-#define DRAWING_H
+#ifndef DRAWING_HPP
+#define DRAWING_HPP
 
-#include "pch.h"
+#include "pch.hpp"
 
 class Drawing
 {

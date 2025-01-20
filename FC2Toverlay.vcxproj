@@ -149,7 +149,7 @@
     <ClCompile Include="uiaccess.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Drawing.h" />
+    <ClInclude Include="Drawing.hpp" />
     <ClInclude Include="fc2.hpp" />
     <ClInclude Include="ImGui\imconfig.h" />
     <ClInclude Include="ImGui\imgui.h" />
@@ -159,9 +159,9 @@
     <ClInclude Include="ImGui\imstb_rectpack.h" />
     <ClInclude Include="ImGui\imstb_textedit.h" />
     <ClInclude Include="ImGui\imstb_truetype.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="UI.h" />
-    <ClInclude Include="uiaccess.h" />
+    <ClInclude Include="pch.hpp" />
+    <ClInclude Include="UI.hpp" />
+    <ClInclude Include="uiaccess.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

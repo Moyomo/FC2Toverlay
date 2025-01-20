@@ -1,4 +1,4 @@
-#include "uiaccess.h"
+#include "uiaccess.hpp"
 
 static DWORD DuplicateWinloginToken(DWORD dwSessionId, DWORD dwDesiredAccess, PHANDLE phToken) {
 	DWORD dwErr;

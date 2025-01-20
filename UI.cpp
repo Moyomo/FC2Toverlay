@@ -1,6 +1,6 @@
-#include "UI.h"
-#include "Drawing.h"
-#include "uiaccess.h"
+#include "UI.hpp"
+#include "Drawing.hpp"
+#include "uiaccess.hpp"
 
 ID3D11Device* UI::pd3dDevice = nullptr;
 ID3D11DeviceContext* UI::pd3dDeviceContext = nullptr;
@@ -154,7 +154,6 @@ void UI::Render()
     // get UIAccess so we can draw on top of fullscreen windows
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     DWORD dwErr = PrepareForUIAccess();
-    //DWORD dwErr = ERROR_NOT_FOUND;
 
     // tell windows that our application is DPI aware to prevent automatic scaling
     ImGui_ImplWin32_EnableDpiAwareness();

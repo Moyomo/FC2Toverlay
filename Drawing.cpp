@@ -1,5 +1,4 @@
-#include "Drawing.h"
-#include "fc2.hpp"
+#include "Drawing.hpp"
 
 LPCSTR Drawing::lpWindowName = "Overlay Performance";
 ImVec2 Drawing::vWindowSize = { 300, 85 };
@@ -75,8 +74,7 @@ void Drawing::Draw(BOOL bDebug)
 		// draw red rectangle around target window client
 		ImVec2 displaySize = ImGui::GetIO().DisplaySize;
 		auto canvas = ImGui::GetBackgroundDrawList();
-		ImVec2 origin = ImVec2(0, 0);
-		canvas->AddRect(origin, displaySize, IM_COL32(255, 0, 0, 255));
+		canvas->AddRect(ImVec2(0, 0), displaySize, ImColor(255, 0, 0, 255));
 
 		// draw window with info about overlay performance
 		ImGui::SetNextWindowSize(vWindowSize, ImGuiCond_Once);

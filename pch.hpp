@@ -1,5 +1,5 @@
-#ifndef PCH_H
-#define PCH_H
+#ifndef PCH_HPP
+#define PCH_HPP
 
 #define NOMINMAX
 #define FC2_TEAM_CONSTELLATION4

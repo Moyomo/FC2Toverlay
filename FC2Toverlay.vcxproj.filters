@@ -50,7 +50,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pch.h">
+    <ClInclude Include="pch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImGui\imconfig.h">
@@ -77,16 +77,16 @@
     <ClInclude Include="ImGui\imstb_truetype.h">
       <Filter>Header Files\ImGui</Filter>
     </ClInclude>
-    <ClInclude Include="UI.h">
+    <ClInclude Include="UI.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Drawing.h">
+    <ClInclude Include="Drawing.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="fc2.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="uiaccess.h">
+    <ClInclude Include="uiaccess.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
