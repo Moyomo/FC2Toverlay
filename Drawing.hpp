@@ -6,11 +6,11 @@
 class Drawing
 {
 private:
-	static LPCSTR lpWindowName;
-	static ImVec2 vWindowSize;
+    static LPCSTR lpWindowName;
+    static ImVec2 vWindowSize;
 
 public:
-	static void Draw(BOOL bDebug);
+    static void Draw(BOOL bDebug);
 };
 
 #endif
