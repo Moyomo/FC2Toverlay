@@ -27,8 +27,6 @@ enum ZBID
 // undocumented WinAPI function to create windows in specified band
 typedef HWND(WINAPI* CreateWindowInBand)(_In_ DWORD dwExStyle, _In_opt_ LPCWSTR atom, _In_opt_ LPCWSTR lpWindowName, _In_ DWORD dwStyle, _In_ int X, _In_ int Y, _In_ int nWidth, _In_ int nHeight, _In_opt_ HWND hWndParent, _In_opt_ HMENU hMenu, _In_opt_ HINSTANCE hInstance, _In_opt_ LPVOID lpParam, DWORD band);
 
-CreateWindowInBand pCreateWindowInBand = reinterpret_cast<CreateWindowInBand>(GetProcAddress(LoadLibraryA("user32.dll"), "CreateWindowInBand"));
-
 /**
  * @brief Create a D3D11 device
  * @param hWnd handle to the overlay window
@@ -164,7 +162,7 @@ void UI::Render()
 
     // create window in highest z-order possible
     DWORD band = dwErr == ERROR_SUCCESS ? ZBID_UIACCESS : ZBID_DESKTOP;
-    const HWND hwnd = pCreateWindowInBand(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
+    const HWND hwnd = LI_FN_DEF(CreateWindowInBand).in(LI_MODULE("User32.dll").cached())(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
 
     // set display affinity to hide the window in screen captures
     if (bStreamProof)
@@ -216,7 +214,7 @@ void UI::Render()
         }
 
         // check if the user pressed the exit key
-        if (GetAsyncKeyState(VK_END) & 1)
+        if (LI_FN(GetAsyncKeyState).in_cached(LI_MODULE("User32.dll").cached())(VK_END) & 1)
             bDone = true;
 
         // check for the last FC2 error message
@@ -297,10 +295,10 @@ bool UI::SetTargetWindow()
         return false;
 
     HWND hWindow = (HWND)IntToPtr(iTargetHandle);
-    if (!IsWindow(hWindow))
+    if (!LI_FN(IsWindow).in_cached(LI_MODULE("User32.dll").cached())(hWindow))
         return false;
     hTargetWindow = hWindow;
-    GetWindowThreadProcessId(hTargetWindow, &dTargetPID);
+    LI_FN(GetWindowThreadProcessId).in_cached(LI_MODULE("User32.dll").cached())(hTargetWindow, &dTargetPID);
     return true;
 }
 
@@ -315,10 +313,10 @@ BOOL UI::IsWindowAlive()
     if (hTargetWindow == nullptr)
         return FALSE;
 
-    if (!IsWindow(hTargetWindow))
+    if (!LI_FN(IsWindow).in_cached(LI_MODULE("User32.dll").cached())(hTargetWindow))
         return FALSE;
 
-    GetWindowThreadProcessId(hTargetWindow, &dCurrentPID);
+    LI_FN(GetWindowThreadProcessId).in_cached(LI_MODULE("User32.dll").cached())(hTargetWindow, &dCurrentPID);
 
     if (dCurrentPID != dTargetPID)
         return FALSE;
@@ -337,14 +335,14 @@ BOOL UI::IsWindowFocus(const HWND hCurrentProcessWindow)
     char lpCurrentWindowClass[125];
     char lpOverlayWindowClass[125];
 
-    const HWND hCurrentWindowUsed = GetForegroundWindow();
-    if (GetClassNameA(hCurrentWindowUsed, lpCurrentWindowUsedClass, sizeof(lpCurrentWindowUsedClass)) == 0)
+    const HWND hCurrentWindowUsed = LI_FN(GetForegroundWindow).in_cached(LI_MODULE("User32.dll").cached())();
+    if (LI_FN(GetClassNameA).in_cached(LI_MODULE("User32.dll").cached())(hCurrentWindowUsed, lpCurrentWindowUsedClass, sizeof(lpCurrentWindowUsedClass)) == 0)
         return FALSE;
 
-    if (GetClassNameA(hTargetWindow, lpCurrentWindowClass, sizeof(lpCurrentWindowClass)) == 0)
+    if (LI_FN(GetClassNameA).in_cached(LI_MODULE("User32.dll").cached())(hTargetWindow, lpCurrentWindowClass, sizeof(lpCurrentWindowClass)) == 0)
         return FALSE;
 
-    if (GetClassNameA(hCurrentProcessWindow, lpOverlayWindowClass, sizeof(lpOverlayWindowClass)) == 0)
+    if (LI_FN(GetClassNameA).in_cached(LI_MODULE("User32.dll").cached())(hCurrentProcessWindow, lpOverlayWindowClass, sizeof(lpOverlayWindowClass)) == 0)
         return FALSE;
 
     if (strcmp(lpCurrentWindowUsedClass, lpCurrentWindowClass) != 0 && strcmp(lpCurrentWindowUsedClass, lpOverlayWindowClass) != 0)

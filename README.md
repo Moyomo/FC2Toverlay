@@ -41,5 +41,6 @@ Only works on 64 bit Windows. Please use the forum thread for questions and supp
 
 - [killtimer0](https://github.com/killtimer0/) - UIAccess PoC
 - [adamhlt](https://github.com/adamhlt/) - inspiration/idea
+- [JustasMasiulis](https://github.com/JustasMasiulis/) - lazy importer library
 - [ImGui](https://github.com/ocornut/imgui) - great graphics library
 - [typedef](https://github.com/typedef-FC/) - FC2 & FC2T

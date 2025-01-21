@@ -3,6 +3,8 @@
 
 #define NOMINMAX
 #define FC2_TEAM_CONSTELLATION4
+#define LAZY_IMPORTER_CASE_INSENSITIVE
+#define LAZY_IMPORTER_HARDENED_MODULE_CHECKS
 
 #include <windows.h>
 #include <dwmapi.h>
@@ -16,5 +18,6 @@
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_dx11.h"
 #include "ImGui/imgui_impl_win32.h"
+#include "lazy_importer.hpp"
 
 #endif
