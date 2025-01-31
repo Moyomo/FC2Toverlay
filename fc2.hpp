@@ -11,7 +11,7 @@
   * @brief versioning
   */
 #define FC2_TEAM_VERSION_MAJOR 1
-#define FC2_TEAM_VERSION_MINOR 4
+#define FC2_TEAM_VERSION_MINOR 6
 
   /**
    * @brief max size of any string input. dynamically allocating this would be better. there are some unfortunate inconsistencies with this at times when it is dynamically allocated due to how some processors cache memory to improve performance.
@@ -226,7 +226,6 @@ enum FC2_TEAM_DRAW_DIMENSIONS : int
 #include <variant> /** std::variant **/
 #include <optional> /** std::optional **/
 #include <cstddef> /** offsetof **/
-#include <array> /** std::array **/
 #include <algorithm> /** std::min/std::max/std::copy_if **/
 
 #ifdef __linux__
@@ -253,6 +252,7 @@ enum FC2_TEAM_DRAW_DIMENSIONS : int
 #else
 #define NOMINMAX
 #include <windows.h>
+#include <iterator>
 
 #ifdef FC2_TEAM_CONSTELLATION4
 #define SHM_KEY SHM_KEY_WIN_CONSTELLATION
@@ -292,7 +292,7 @@ namespace fc2
             /**
              * @brief ping pong
              */
-            struct ping
+            struct ping_pong
             {
                 unsigned long long ping;
                 unsigned long long pong;
@@ -552,7 +552,7 @@ namespace fc2
                  * @brief attach to data
                  */
                 data = shmat(id, nullptr, 0);
-                if ((char*)data == (char*)-1)
+                if (static_cast <char*>(data) == reinterpret_cast <char*>(-1))
                 {
                     /**
                      * @brief memory failed to attach
@@ -631,23 +631,7 @@ namespace fc2
                 /**
                  * @brief get client
                  */
-                static auto c = obj.get();
-
-                /**
-                 * @brief did something break
-                */
-#ifdef __linux__
-                if (c->id < 0 || c->last_error != FC2_TEAM_ERROR_CODES::FC2_TEAM_ERROR_NO_ERROR)
-                {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                }
-#else
-                if (c->shm_handle == nullptr || c->shm_handle == INVALID_HANDLE_VALUE)
-                {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                }
-#endif
-                return c;
+                return obj.get();
             }
 
             /**
@@ -658,7 +642,7 @@ namespace fc2
              * @return
              */
             template< typename t >
-            FC2T_FUNCTION auto send(int id, t req) -> t
+            FC2T_FUNCTION auto send(const int id, t req) -> t
             {
                 /**
                  * @brief get client
@@ -671,7 +655,8 @@ namespace fc2
 #ifdef __linux__
                 if (c->id < 0 || c->last_error != FC2_TEAM_ERROR_CODES::FC2_TEAM_ERROR_NO_ERROR)
                 {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    c->last_error = FC2_TEAM_ERROR_NO_FC2_SOLUTION_OPEN;
+                    return req;
                 }
 
                 /**
@@ -682,7 +667,8 @@ namespace fc2
 
                 if (c->shm_handle == nullptr || c->shm_handle == INVALID_HANDLE_VALUE || c->last_error != FC2_TEAM_ERROR_CODES::FC2_TEAM_ERROR_NO_ERROR)
                 {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    c->last_error = FC2_TEAM_ERROR_NO_FC2_SOLUTION_OPEN;
+                    return req;
                 }
 
                 /**
@@ -694,7 +680,7 @@ namespace fc2
                 /**
                  * @brief create new data with our request info
                  */
-                auto data = std::make_unique< char[] >(offsetof(information, data) + sizeof(t));
+                const auto data = std::make_unique< char[] >(offsetof(information, data) + sizeof(t));
                 {
                     memcpy(data.get(), static_cast<const void*>(&id), sizeof(detail::information::id));
                     memcpy(data.get() + offsetof(information, data), static_cast<const void*>(&req), sizeof(t));
@@ -708,12 +694,12 @@ namespace fc2
                 /**
                  * @brief convert data
                  */
-                auto information = reinterpret_cast<detail::information*>(c->data);
+                const auto information = static_cast<detail::information*>(c->data);
 
                 /**
                  * @brief wait until completed
                  */
-                unsigned long long timeout_time = std::time(nullptr) + (information->id == FC2_TEAM_REQUESTS::FC2_TEAM_REQUESTS_API || information->id == FC2_TEAM_REQUESTS::FC2_TEAM_REQUESTS_HTTP_REQUEST ? FC2_TEAM_REQUESTS_API_TIMEOUT : FC2_TEAM_REQUESTS_TIMEOUT);
+                const unsigned long long timeout_time = std::time(nullptr) + (information->id == FC2_TEAM_REQUESTS::FC2_TEAM_REQUESTS_API || information->id == FC2_TEAM_REQUESTS::FC2_TEAM_REQUESTS_HTTP_REQUEST ? FC2_TEAM_REQUESTS_API_TIMEOUT : FC2_TEAM_REQUESTS_TIMEOUT);
 
                 while (information->status == FC2_TEAM_STATUS::FC2_TEAM_SERVER_PENDING) {
                     if (static_cast<unsigned long long>(std::time(nullptr)) > timeout_time)
@@ -755,6 +741,7 @@ namespace fc2
              * @brief safely copy values
              * @param dest
              * @param src
+             * @param size
              */
             FC2T_FUNCTION void safe_copy(char* dest, const char* src, const std::size_t size)
             {
@@ -806,18 +793,18 @@ namespace fc2
      */
     FC2T_FUNCTION auto ping() -> std::pair< unsigned long long, unsigned long long >
     {
-        detail::requests::ping data{};
+        detail::requests::ping_pong data{};
         {
-            auto now = std::chrono::high_resolution_clock::now();
-            auto epoch = now.time_since_epoch();
-            auto ticks = std::chrono::duration_cast<std::chrono::microseconds>(epoch).count();
+            const auto now = std::chrono::high_resolution_clock::now();
+            const auto epoch = now.time_since_epoch();
+            const auto ticks = std::chrono::duration_cast<std::chrono::microseconds>(epoch).count();
 
             data.ping = ticks;
         }
 
-        auto ret = detail::client::send< detail::requests::ping >(FC2_TEAM_REQUESTS_PING, data);
+        const auto [ping, pong] = detail::client::send< detail::requests::ping_pong >(FC2_TEAM_REQUESTS_PING, data);
 
-        return std::make_pair(ret.ping, ret.pong);
+        return std::make_pair(ping, pong);
     }
 
     /**
@@ -852,8 +839,8 @@ namespace fc2
             detail::helper::safe_copy(data.url, url, sizeof data.url);
         }
 
-        auto ret = detail::client::send(FC2_TEAM_REQUESTS_API, data);
-        return ret.buffer;
+        auto [_, buffer] = detail::client::send(FC2_TEAM_REQUESTS_API, data);
+        return buffer;
     }
 
     /**
@@ -892,6 +879,8 @@ namespace fc2
      * @brief makes all universe4 scripts invoke "on_team_call". this is a faster version of /luar
      * @tparam t
      * @param identifier this helps "on_team_call" identify the script or action.
+     * @param typing
+     * @param json
      *
      * @code
      *
@@ -957,29 +946,26 @@ namespace fc2
      */
     FC2T_FUNCTION auto setup() -> bool
     {
-        detail::requests::setup data;
-        auto ret = detail::client::send(FC2_TEAM_REQUESTS_SETUP, data);
-        return ret.result;
+        constexpr detail::requests::setup data;
+        auto [result] = detail::client::send(FC2_TEAM_REQUESTS_SETUP, data);
+        return result;
     }
 
     /**
      * @brief this gets the current drawing requests inside of FC2. the original plan was to simply create an array and always have a static return result. however, this would not only increase the buffer size of FC2T, but it's less reliable.
      *
-     * sync is questionable. it will help with overlay projects and any other renderers that require information to be synchronized, but it can go faulty if there is genuinely nothing to draw. you can actually freeze your renderer this way. this is so bad ughhhhhhhhhhh. ill fix this.
-     *
-     * @param sync
      * @return
      */
     FC2T_FUNCTION auto get_drawing() -> std::vector< fc2::detail::requests::draw::detail >
     {
         std::vector< fc2::detail::requests::draw::detail > output;
-        detail::requests::draw data;
+        constexpr detail::requests::draw data;
 
-        auto ret = detail::client::send(FC2_TEAM_REQUESTS_DRAW, data);
+        auto [details] = detail::client::send(FC2_TEAM_REQUESTS_DRAW, data);
 
         std::copy_if(
-            std::begin(ret.details),
-            std::end(ret.details),
+            std::begin(details),
+            std::end(details),
             std::back_inserter(output),
             [](const fc2::detail::requests::draw::detail& o)
             {
@@ -995,8 +981,8 @@ namespace fc2
      */
     FC2T_FUNCTION auto get_session() -> detail::requests::session
     {
-        detail::requests::session data;
-        auto ret = detail::client::send(FC2_TEAM_REQUESTS_SESSION, data);
+        constexpr detail::requests::session data;
+        const auto ret = detail::client::send(FC2_TEAM_REQUESTS_SESSION, data);
         return ret;
     }
 
@@ -1023,7 +1009,7 @@ namespace fc2
             /**
              * @brief deduce argument type and assign based on type
              */
-            auto ret = std::visit([&data](auto&& arg) {
+            const auto ret = std::visit([&data](auto&& arg) {
 
                 using t = std::decay_t< decltype(arg) >;
 
@@ -1066,7 +1052,7 @@ namespace fc2
          *
          * @return
          */
-        FC2T_FUNCTION auto get_module(const std::string& name, int partition = 0) -> std::pair< unsigned long long, unsigned long long >
+        FC2T_FUNCTION auto get_module(const std::string& name, const int partition = 0) -> std::pair< unsigned long long, unsigned long long >
         {
             detail::requests::module data;
             {
@@ -1098,7 +1084,7 @@ namespace fc2
          * @param ds data segment
          * @return
          */
-        FC2T_FUNCTION auto pattern(const std::string& module, const std::string& pattern, unsigned int offset, bool is_x64 = true, bool relative = true, bool ds = false) -> unsigned long long
+        FC2T_FUNCTION auto pattern(const std::string& module, const std::string& pattern, const unsigned int offset, const bool is_x64 = true, const bool relative = true, bool ds = false) -> unsigned long long
         {
             detail::requests::pattern data;
             {
@@ -1130,7 +1116,7 @@ namespace fc2
                 data.size = sizeof(t);
             }
 
-            auto ret = detail::client::send(FC2_TEAM_REQUESTS_READ_MEMORY, data);
+            const auto ret = detail::client::send(FC2_TEAM_REQUESTS_READ_MEMORY, data);
 
             /**
              * @brief operation failed.
@@ -1175,7 +1161,7 @@ namespace fc2
                 detail::helper::safe_copy(data.url, url, sizeof data.url);
             }
 
-            auto ret = detail::client::send(FC2_TEAM_REQUESTS_HTTP_REQUEST, data);
+            const auto ret = detail::client::send(FC2_TEAM_REQUESTS_HTTP_REQUEST, data);
             return ret.response;
         }
 
@@ -1193,7 +1179,7 @@ namespace fc2
                 detail::helper::safe_copy(data.post, post_data, sizeof data.post);
             }
 
-            auto ret = detail::client::send(FC2_TEAM_REQUESTS_HTTP_REQUEST, data);
+            const auto ret = detail::client::send(FC2_TEAM_REQUESTS_HTTP_REQUEST, data);
             return ret.response;
         }
 
@@ -1209,8 +1195,8 @@ namespace fc2
                 detail::helper::safe_copy(data.str, str, sizeof data.str);
             }
 
-            auto ret = detail::client::send(FC2_TEAM_REQUESTS_HTTP_ESCAPE, data);
-            return ret.response;
+            auto [_, response] = detail::client::send(FC2_TEAM_REQUESTS_HTTP_ESCAPE, data);
+            return response;
         }
     }
 
@@ -1239,7 +1225,7 @@ namespace fc2
          * @brief clicks a mouse button
          * @param button
          */
-        FC2T_FUNCTION auto click(FC2_TEAM_MOUSE_CODE button) -> void
+        FC2T_FUNCTION auto click(const FC2_TEAM_MOUSE_CODE button) -> void
         {
             detail::requests::input data;
             {
@@ -1254,7 +1240,7 @@ namespace fc2
          * @brief holds down a mouse button
          * @param button
          */
-        FC2T_FUNCTION auto down(FC2_TEAM_MOUSE_CODE button) -> void
+        FC2T_FUNCTION auto down(const FC2_TEAM_MOUSE_CODE button) -> void
         {
             detail::requests::input data;
             {
@@ -1269,7 +1255,7 @@ namespace fc2
          * @brief releases a held down mouse button
          * @param button
          */
-        FC2T_FUNCTION auto up(FC2_TEAM_MOUSE_CODE button) -> void
+        FC2T_FUNCTION auto up(const FC2_TEAM_MOUSE_CODE button) -> void
         {
             detail::requests::input data;
             {

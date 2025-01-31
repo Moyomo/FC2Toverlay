@@ -1,9 +1,108 @@
 #include "Drawing.hpp"
+#include "UI.hpp"
+#include "Config.hpp"
 
-LPCSTR Drawing::lpWindowName = "Overlay Performance";
-ImVec2 Drawing::vWindowSize = { 300, 85 };
+// define default values
+std::chrono::steady_clock::time_point Drawing::errorTime = std::chrono::steady_clock::time_point();
+bool Drawing::bDraw = true;
 
-void Drawing::Draw(BOOL bDebug)
+/**
+ * @brief Check if window should get closed
+ */
+bool Drawing::IsActive()
+{
+    return bDraw == true;
+}
+
+/**
+ * @brief Draw the settings window for the overlay
+ */
+void Drawing::DrawSettings()
+{
+    ImGui::SetNextWindowSize({ 300, 200 }, ImGuiCond_Once);
+    ImGui::SetNextWindowFocus();
+    ImGui::SetNextWindowBgAlpha(1.0f);
+    ImGui::Begin("Overlay settings", &bDraw, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    {
+        // show Constellation connection status
+        bool constellationConnected = Config::IsConstellationConnected();
+
+        ImGui::Text("FC2 status:");
+        ImGui::SameLine();
+        if (constellationConnected)
+            ImGui::TextColored({ 0.2f, 0.8f, 0.2f, 1.0f }, "Connected");
+        else
+        {
+            ImGui::TextColored({ 0.9f, 0.1f, 0.0f, 1.0f }, "Not connected");
+            ImGui::Text("Launch Constellation and restart the overlay");
+        }
+
+        // draw overlay config options
+        ImGui::Separator();
+        if (!constellationConnected) ImGui::BeginDisabled();
+
+        ImGui::Checkbox("Streamproof", &Config::bStreamProof);
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Target FPS");
+        ImGui::SameLine();
+        if (ImGui::InputInt(" ", &Config::iTargetFPS, 10, 50, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
+        {
+            Config::iTargetFPS = std::min(1000, std::max(Config::iTargetFPS, 0));
+            Config::targetFrametime = std::chrono::microseconds(Config::iTargetFPS == 0 ? 1 : 1000000 / Config::iTargetFPS);
+        }
+        if (!constellationConnected) ImGui::EndDisabled();
+        ImGui::Checkbox("Debug mode", &Config::bDebug);
+
+        ImGui::Separator();
+        if (!constellationConnected) ImGui::BeginDisabled();
+
+        // config buttons
+        if (ImGui::Button("Save config")) Config::SaveConfig();
+        ImGui::SameLine();
+        if (ImGui::Button("Load config")) Config::GetConfig();
+
+        // button to start the overlay
+        ImGui::Dummy({ 0.0f, 1.0f });
+        if (ImGui::Button("Start overlay"))
+        {
+            if (UI::SetTargetWindow())
+            {
+                Config::bCreateOverlay = true;
+                bDraw = false;
+            }
+            else
+                errorTime = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        }
+
+        // show error message when overlay creation fails
+        if (std::chrono::steady_clock::now() < errorTime)
+            ImGui::TextColored({ 0.9, 0.1, 0.0, 1.0 }, "Can't find the target window! Make sure\nConstellation is fully calibrated\nand try again.");
+        if (!constellationConnected) ImGui::EndDisabled();
+
+        // debug info
+        if (Config::bDebug)
+        {
+            ImGui::Separator();
+            ImGui::TextColored({ 0.2, 0.4, 1.0, 1.0 }, "Debug Info");
+            ImGui::Text("Overlay version: 1.1");
+            auto fc2tVersion = fc2::get_version();
+            ImGui::Text("Used FC2T version: %i.%i", fc2tVersion.first, fc2tVersion.second);
+            ImGui::Text("Current FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::Text("UIAccess status: %d", (uint32_t)UI::dwUIAccessErr);
+            ImGui::Text("Target handle: %d", (uint32_t)UI::hTargetWindow);
+            ImGui::Text("Target process ID: %d", (uint32_t)UI::dTargetPID);
+            auto frametime = Config::targetFrametime.count();
+            ImGui::Text("Overlay target frametime:\n%llu microseconds", frametime);
+        }
+    }
+    ImGui::End();
+}
+
+/**
+ * @brief Draw the overlay content
+ */
+void Drawing::Draw()
 {
     if (fc2::get_error() == FC2_TEAM_ERROR_NO_ERROR)
     {
@@ -69,7 +168,7 @@ void Drawing::Draw(BOOL bDebug)
         }
     }
 
-    if (bDebug)
+    if (Config::bDebug)
     {
         // draw red rectangle around target window client
         ImVec2 displaySize = ImGui::GetIO().DisplaySize;
@@ -77,9 +176,9 @@ void Drawing::Draw(BOOL bDebug)
         canvas->AddRect(ImVec2(0, 0), displaySize, ImColor(255, 0, 0, 255));
 
         // draw window with info about overlay performance
-        ImGui::SetNextWindowSize(vWindowSize, ImGuiCond_Once);
-        ImGui::SetNextWindowBgAlpha(1.0f);
-        ImGui::Begin(lpWindowName);
+        ImGui::SetNextWindowSize({ 300, 85 }, ImGuiCond_Once);
+        ImGui::SetNextWindowBgAlpha(0.7f);
+        ImGui::Begin("Overlay Performance", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
         {
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
             ImGui::Text("Frametime: %.3f ms/frame", 1000.0f / ImGui::GetIO().Framerate);

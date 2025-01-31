@@ -137,6 +137,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Config.cpp" />
     <ClCompile Include="Drawing.cpp" />
     <ClCompile Include="ImGui\imgui.cpp" />
     <ClCompile Include="ImGui\imgui_draw.cpp" />
@@ -149,6 +150,7 @@
     <ClCompile Include="uiaccess.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Config.hpp" />
     <ClInclude Include="Drawing.hpp" />
     <ClInclude Include="fc2.hpp" />
     <ClInclude Include="ImGui\imconfig.h" />

@@ -6,11 +6,13 @@
 class Drawing
 {
 private:
-    static LPCSTR lpWindowName;
-    static ImVec2 vWindowSize;
+    static std::chrono::steady_clock::time_point errorTime;
+    static bool bDraw;
 
 public:
-    static void Draw(BOOL bDebug);
+    static bool IsActive();
+    static void DrawSettings();
+    static void Draw();
 };
 
 #endif

@@ -12,12 +12,7 @@ private:
     static ID3D11DeviceContext* pd3dDeviceContext;
     static IDXGISwapChain* pSwapChain;
     static ID3D11RenderTargetView* pMainRenderTargetView;
-    static HWND hTargetWindow;
-    static DWORD dTargetPID;
     static RECT targetClient;
-    static BOOL bStreamProof;
-    static std::chrono::microseconds targetFrametime;
-    static BOOL bDebug;
 
     static bool CreateDeviceD3D(HWND hWnd);
     static void CleanupDeviceD3D();
@@ -29,9 +24,13 @@ private:
     static void MoveWindow(HWND hCurrentProcessWindow);
 
 public:
-    static void Render();
+    static HWND hTargetWindow;
+    static DWORD dTargetPID;
+    static DWORD dwUIAccessErr;
+
+    static void RenderSettingsWindow();
+    static void RenderOverlay();
     static bool SetTargetWindow();
-    static void GetConfigSettings();
 };
 
 #endif

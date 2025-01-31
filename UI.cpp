@@ -1,17 +1,19 @@
 #include "UI.hpp"
 #include "Drawing.hpp"
 #include "uiaccess.hpp"
+#include "Config.hpp"
 
+// define default values
 ID3D11Device* UI::pd3dDevice = nullptr;
 ID3D11DeviceContext* UI::pd3dDeviceContext = nullptr;
 IDXGISwapChain* UI::pSwapChain = nullptr;
 ID3D11RenderTargetView* UI::pMainRenderTargetView = nullptr;
 HWND UI::hTargetWindow = nullptr;
 DWORD UI::dTargetPID = 0;
+DWORD UI::dwUIAccessErr = ERROR_NOT_FOUND;
 RECT UI::targetClient = {};
-BOOL UI::bStreamProof = TRUE;
-BOOL UI::bDebug = FALSE;
-std::chrono::microseconds UI::targetFrametime{ 4000 };
+
+// const variables
 const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 const auto microsecond = std::chrono::microseconds(1);
 const auto millisecond = std::chrono::microseconds(1000);
@@ -145,27 +147,133 @@ LRESULT WINAPI UI::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 }
 
 /**
- * @brief Create overlay window and enter main loop
+ * @brief Create settings window after application was launched
  */
-void UI::Render()
+void UI::RenderSettingsWindow()
 {
     // get UIAccess so we can draw on top of fullscreen windows
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    DWORD dwErr = PrepareForUIAccess();
+    UI::dwUIAccessErr = PrepareForUIAccess();
 
     // tell windows that our application is DPI aware to prevent automatic scaling
     ImGui_ImplWin32_EnableDpiAwareness();
 
+    // create window class and window for the overlay settings
+    const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, _T("OverlaySettings"), nullptr };
+    ::RegisterClassEx(&wc);
+    const HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("OverlaySettings"), WS_OVERLAPPEDWINDOW, 100, 100, 50, 50, NULL, NULL, wc.hInstance, NULL);
+
+    // create D3D11 device
+    if (!CreateDeviceD3D(hwnd))
+    {
+        CleanupDeviceD3D();
+        ::UnregisterClass(wc.lpszClassName, wc.hInstance);
+        MessageBox(
+            NULL,
+            (LPCWSTR)L"Can't create D3D11 device. Make sure your GPU supports Direct3D 10 or 11 feature levels.",
+            (LPCWSTR)L"DirectX 11 Error",
+            MB_ICONWARNING | MB_OK
+        );
+        return;
+    }
+
+    // hide the main window so only our ImGui window shows up
+    ::ShowWindow(hwnd, SW_HIDE);
+    ::UpdateWindow(hwnd);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+    ImGui::StyleColorsDark();
+
+    io.Fonts->AddFontDefault();
+    io.IniFilename = nullptr;
+
+    ImGui_ImplWin32_Init(hwnd);
+    ImGui_ImplDX11_Init(pd3dDevice, pd3dDeviceContext);
+
+    // check if there's a connection to Constellation
+    Config::IsConstellationConnected();
+
+    bool bDone = false;
+
+    while (!bDone)
+    {
+        MSG msg;
+        while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+            if (msg.message == WM_QUIT)
+                bDone = true;
+        }
+
+        // check if the user pressed the exit key
+        if (LI_FN(GetAsyncKeyState).in_cached(LI_MODULE("User32.dll").cached())(VK_END) & 1)
+            bDone = true;
+
+        if (bDone)
+            break;
+
+        // create a new frame
+        ImGui_ImplDX11_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
+        {
+            Drawing::DrawSettings();
+        }
+        ImGui::EndFrame();
+
+        ImGui::Render();
+        pd3dDeviceContext->OMSetRenderTargets(1, &pMainRenderTargetView, nullptr);
+        pd3dDeviceContext->ClearRenderTargetView(pMainRenderTargetView, clear_color);
+        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+        }
+
+        // present current frame on screen
+        pSwapChain->Present(1, 0);
+
+        // check if the settings window was closed
+        if (!Drawing::IsActive())
+            break;
+    }
+
+    // cleanup and shutdown
+    ImGui_ImplDX11_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+
+    CleanupDeviceD3D();
+    ::DestroyWindow(hwnd);
+    ::UnregisterClass(wc.lpszClassName, wc.hInstance);
+
+    // clear window messages
+    MSG msg;
+    while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {}
+}
+
+/**
+ * @brief Create overlay window and enter main loop
+ */
+void UI::RenderOverlay()
+{
     // create window class for the overlay
     const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, _T("FC2Toverlay"), nullptr };
     ::RegisterClassEx(&wc);
 
     // create window in highest z-order possible
-    DWORD band = dwErr == ERROR_SUCCESS ? ZBID_UIACCESS : ZBID_DESKTOP;
+    DWORD band = UI::dwUIAccessErr == ERROR_SUCCESS ? ZBID_UIACCESS : ZBID_DESKTOP;
     const HWND hwnd = LI_FN_DEF(CreateWindowInBand).in(LI_MODULE("User32.dll").cached())(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
 
     // set display affinity to hide the window in screen captures
-    if (bStreamProof)
+    if (Config::bStreamProof)
         SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
 
     // set window styles again because it can't be a layered window when setting the display affinity
@@ -181,15 +289,19 @@ void UI::Render()
     {
         CleanupDeviceD3D();
         ::UnregisterClass(wc.lpszClassName, wc.hInstance);
+        MessageBox(
+            NULL,
+            (LPCWSTR)L"Can't create D3D11 device. Make sure your GPU supports Direct3D 10 or 11 feature levels.",
+            (LPCWSTR)L"DirectX 11 Error",
+            MB_ICONWARNING | MB_OK
+        );
         return;
     }
 
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
 
-    IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-
     ImGui::GetIO().IniFilename = nullptr;
 
     ImGui_ImplWin32_Init(hwnd);
@@ -240,15 +352,12 @@ void UI::Render()
             continue;
         }
 
-        // move the overlay on top of the target window
-        MoveWindow(hwnd);
-
         // create new frame and get drawing requests
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         {
-            Drawing::Draw(bDebug);
+            Drawing::Draw();
         }
         ImGui::EndFrame();
 
@@ -260,10 +369,13 @@ void UI::Render()
         // present current frame on screen
         pSwapChain->Present(0, 0);
 
+        // move the overlay on top of the target window
+        MoveWindow(hwnd);
+
         // calculate the time we have to wait for to achieve our target frametime
         auto frame_end = std::chrono::high_resolution_clock::now();
         auto frame_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start);
-        auto time_to_wait = targetFrametime - frame_time - millisecond;
+        auto time_to_wait = Config::targetFrametime - frame_time - millisecond;
         if (time_to_wait < microsecond)
             time_to_wait = microsecond;
 
@@ -287,6 +399,9 @@ void UI::Render()
  */
 bool UI::SetTargetWindow()
 {
+    if (fc2::get_error() != FC2_TEAM_ERROR_NO_ERROR)
+        return false;
+
     uint32_t iTargetHandle = fc2::call<uint32_t>("directx_overlay_target_handle", FC2_LUA_TYPE_INT);
     if (iTargetHandle == 0)
         return false;
@@ -371,15 +486,4 @@ void UI::MoveWindow(const HWND hCurrentProcessWindow)
 
         SetWindowPos(hCurrentProcessWindow, nullptr, client.left, client.top, client.right - client.left, client.bottom - client.top, SWP_SHOWWINDOW);
     }
-}
-
-/**
- * @brief Get the Lua script settings from FC2
- */
-void UI::GetConfigSettings()
-{
-    bStreamProof = fc2::call<BOOL>("directx_overlay_streamproof", FC2_LUA_TYPE_BOOLEAN);
-    bDebug = fc2::call<BOOL>("directx_overlay_debug", FC2_LUA_TYPE_BOOLEAN);
-    uint32_t iTargetFrametime = 1000000 / fc2::call<uint32_t>("directx_overlay_target_fps", FC2_LUA_TYPE_INT);
-    targetFrametime = std::chrono::microseconds(iTargetFrametime);
 }

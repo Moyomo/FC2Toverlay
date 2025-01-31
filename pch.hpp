@@ -9,9 +9,7 @@
 #include <windows.h>
 #include <dwmapi.h>
 #include <tchar.h>
-#include <vector>
 #include <TlHelp32.h>
-#include <iterator>
 #include <chrono>
 #include "fc2.hpp"
 #include "d3d11.h"

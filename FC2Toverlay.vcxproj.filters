@@ -48,6 +48,9 @@
     <ClCompile Include="uiaccess.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.hpp">
@@ -90,6 +93,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lazy_importer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
