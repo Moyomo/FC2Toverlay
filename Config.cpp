@@ -2,6 +2,7 @@
 
 // define default values
 bool Config::bStreamProof = true;
+bool Config::bAutostart = false;
 bool Config::bDebug = false;
 int Config::iTargetFPS = 250;
 std::chrono::microseconds Config::targetFrametime{ 4000 };
@@ -40,6 +41,7 @@ void Config::GetConfig()
 
     // get saved config values
     bStreamProof = fc2::call<BOOL>("directx_overlay_streamproof", FC2_LUA_TYPE_BOOLEAN);
+    bAutostart = fc2::call<BOOL>("directx_overlay_autostart", FC2_LUA_TYPE_BOOLEAN);
     bDebug = fc2::call<BOOL>("directx_overlay_debug", FC2_LUA_TYPE_BOOLEAN);
     iTargetFPS = fc2::call<uint32_t>("directx_overlay_target_fps", FC2_LUA_TYPE_INT);
     iTargetFPS = std::min(1000, std::max(iTargetFPS, 0));
@@ -51,6 +53,6 @@ void Config::GetConfig()
  */
 void Config::SaveConfig()
 {
-    std::string jsonValue = std::format("{{ \"streamproof\": {0:s}, \"target_framerate\": {1:d}, \"debug_mode\": {2:s} }}", bStreamProof, iTargetFPS, bDebug);
+    std::string jsonValue = std::format("{{ \"streamproof\": {0:s}, \"target_framerate\": {1:d}, \"autostart\": {2:s}, \"debug_mode\": {3:s} }}", bStreamProof, iTargetFPS, bAutostart, bDebug);
     fc2::call("directx_overlay_save", jsonValue);
 }

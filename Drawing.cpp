@@ -51,6 +51,7 @@ void Drawing::DrawSettings()
             Config::iTargetFPS = std::min(1000, std::max(Config::iTargetFPS, 0));
             Config::targetFrametime = std::chrono::microseconds(Config::iTargetFPS == 0 ? 1 : 1000000 / Config::iTargetFPS);
         }
+        ImGui::Checkbox("Autostart (skip this window)", &Config::bAutostart);
         if (!constellationConnected) ImGui::EndDisabled();
         ImGui::Checkbox("Debug mode", &Config::bDebug);
 
@@ -85,7 +86,7 @@ void Drawing::DrawSettings()
         {
             ImGui::Separator();
             ImGui::TextColored({ 0.2, 0.4, 1.0, 1.0 }, "Debug Info");
-            ImGui::Text("Overlay version: 1.1");
+            ImGui::Text("Overlay version: 1.2"); // yes, this is stupid
             auto fc2tVersion = fc2::get_version();
             ImGui::Text("Used FC2T version: %i.%i", fc2tVersion.first, fc2tVersion.second);
             ImGui::Text("Current FPS: %.1f", ImGui::GetIO().Framerate);

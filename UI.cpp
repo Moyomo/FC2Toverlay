@@ -158,6 +158,16 @@ void UI::RenderSettingsWindow()
     // tell windows that our application is DPI aware to prevent automatic scaling
     ImGui_ImplWin32_EnableDpiAwareness();
 
+    // check if there's a connection to Constellation
+    Config::IsConstellationConnected();
+
+    // skip settings window if the autostart option is enabled
+    if (Config::bAutostart && UI::SetTargetWindow())
+    {
+        Config::bCreateOverlay = true;
+        return;
+    }
+
     // create window class and window for the overlay settings
     const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, _T("OverlaySettings"), nullptr };
     ::RegisterClassEx(&wc);
@@ -193,9 +203,6 @@ void UI::RenderSettingsWindow()
 
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(pd3dDevice, pd3dDeviceContext);
-
-    // check if there's a connection to Constellation
-    Config::IsConstellationConnected();
 
     bool bDone = false;
 
@@ -301,6 +308,7 @@ void UI::RenderOverlay()
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
 
+    IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename = nullptr;
 

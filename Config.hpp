@@ -10,6 +10,7 @@ private:
 
 public:
     static bool bStreamProof;
+    static bool bAutostart;
     static bool bDebug;
     static int iTargetFPS;
     static std::chrono::microseconds targetFrametime;
