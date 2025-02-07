@@ -86,7 +86,7 @@ void Drawing::DrawSettings()
         {
             ImGui::Separator();
             ImGui::TextColored({ 0.2, 0.4, 1.0, 1.0 }, "Debug Info");
-            ImGui::Text("Overlay version: 1.2"); // yes, this is stupid
+            ImGui::Text("Overlay version: 1.2.1"); // yes, this is stupid
             auto fc2tVersion = fc2::get_version();
             ImGui::Text("Used FC2T version: %i.%i", fc2tVersion.first, fc2tVersion.second);
             ImGui::Text("Current FPS: %.1f", ImGui::GetIO().Framerate);
@@ -108,7 +108,7 @@ void Drawing::Draw()
     if (fc2::get_error() == FC2_TEAM_ERROR_NO_ERROR)
     {
         // get drawing requests from FC2
-        auto drawing = fc2::get_drawing();
+        auto drawing = fc2::draw::get();
 
         // get the default font
         ImFont* font = ImGui::GetIO().Fonts->Fonts[0];
