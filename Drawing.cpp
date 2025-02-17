@@ -86,7 +86,7 @@ void Drawing::DrawSettings()
         {
             ImGui::Separator();
             ImGui::TextColored({ 0.2, 0.4, 1.0, 1.0 }, "Debug Info");
-            ImGui::Text("Overlay version: 1.2.1"); // yes, this is stupid
+            ImGui::Text("Overlay version: 1.2.2"); // yes, this is stupid
             auto fc2tVersion = fc2::get_version();
             ImGui::Text("Used FC2T version: %i.%i", fc2tVersion.first, fc2tVersion.second);
             ImGui::Text("Current FPS: %.1f", ImGui::GetIO().Framerate);
@@ -161,9 +161,25 @@ void Drawing::Draw()
                 {
                     canvas->AddRect(min, max, clr, NULL, NULL, static_cast<float>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]));
                 }
-                else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX_FILLED)
+                else
                 {
                     canvas->AddRectFilled(min, max, clr);
+                }
+            }
+
+            // draw normal or filled circles
+            else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE || i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE_FILLED)
+            {
+                const auto pos = ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]);
+                const auto clr = ImColor(static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]));
+
+                if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE)
+                {
+                    canvas->AddCircle(pos, i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS], clr);
+                }
+                else
+                {
+                    canvas->AddCircleFilled(pos, i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS], clr);
                 }
             }
         }
