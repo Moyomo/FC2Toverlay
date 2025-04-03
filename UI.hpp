@@ -13,6 +13,7 @@ private:
     static IDXGISwapChain* pSwapChain;
     static ID3D11RenderTargetView* pMainRenderTargetView;
     static RECT targetClient;
+    static DWORD dwWindowStyles;
 
     static bool CreateDeviceD3D(HWND hWnd);
     static void CleanupDeviceD3D();

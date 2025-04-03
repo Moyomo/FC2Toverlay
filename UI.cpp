@@ -12,6 +12,7 @@ HWND UI::hTargetWindow = nullptr;
 DWORD UI::dTargetPID = 0;
 DWORD UI::dwUIAccessErr = ERROR_NOT_FOUND;
 RECT UI::targetClient = {};
+DWORD UI::dwWindowStyles = WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
 
 // const variables
 const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -151,9 +152,11 @@ LRESULT WINAPI UI::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
  */
 void UI::RenderSettingsWindow()
 {
+#ifndef _DEBUG
     // get UIAccess so we can draw on top of fullscreen windows
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     UI::dwUIAccessErr = PrepareForUIAccess();
+#endif // !_DEBUG
 
     // tell windows that our application is DPI aware to prevent automatic scaling
     ImGui_ImplWin32_EnableDpiAwareness();
@@ -277,14 +280,25 @@ void UI::RenderOverlay()
 
     // create window in highest z-order possible
     DWORD band = UI::dwUIAccessErr == ERROR_SUCCESS ? ZBID_UIACCESS : ZBID_DESKTOP;
-    const HWND hwnd = LI_FN_DEF(CreateWindowInBand).in(LI_MODULE("User32.dll").cached())(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
+
+#ifdef _DEBUG
+    // only add the topmost window style if there is no UIAccess
+    if (UI::dwUIAccessErr != ERROR_SUCCESS)
+        UI::dwWindowStyles |= WS_EX_TOPMOST;
+#endif // _DEBUG
+
+    // create overlay window
+    const HWND hwnd = LI_FN_DEF(CreateWindowInBand).in(LI_MODULE("User32.dll").cached())(UI::dwWindowStyles, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
 
     // set display affinity to hide the window in screen captures
     if (Config::bStreamProof)
         SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
 
+    // add layered window to the stored window styles
+    UI::dwWindowStyles |= WS_EX_LAYERED;
+
     // set window styles again because it can't be a layered window when setting the display affinity
-    SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+    SetWindowLong(hwnd, GWL_EXSTYLE, UI::dwWindowStyles);
 
     // set window transparency
     SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
@@ -470,7 +484,7 @@ BOOL UI::IsWindowFocus(const HWND hCurrentProcessWindow)
 
     if (strcmp(lpCurrentWindowUsedClass, lpCurrentWindowClass) != 0 && strcmp(lpCurrentWindowUsedClass, lpOverlayWindowClass) != 0)
     {
-        SetWindowLong(hCurrentProcessWindow, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+        SetWindowLong(hCurrentProcessWindow, GWL_EXSTYLE, UI::dwWindowStyles);
         return FALSE;
     }
 
