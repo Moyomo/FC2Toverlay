@@ -113,7 +113,7 @@ void Drawing::DrawSettings()
         {
             ImGui::Separator();
             ImGui::TextColored({ 0.2f, 0.4f, 1.0f, 1.0f }, "Debug Info");
-            ImGui::Text("Overlay version: 1.2.2"); // yes, this is stupid
+            ImGui::Text("Overlay version: 1.3"); // yes, this is stupid
             auto fc2tVersion = fc2::get_version();
             ImGui::Text("Used FC2T version: %i.%i", fc2tVersion.first, fc2tVersion.second);
             ImGui::Text("Current FPS: %.1f", ImGui::GetIO().Framerate);
@@ -208,7 +208,7 @@ void Drawing::Draw()
 
                 if (style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE)
                 {
-                    canvas->AddCircle(pos, style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS], clr);
+                    canvas->AddCircle(pos, static_cast<float>(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]), clr);
                 }
                 else
                 {
