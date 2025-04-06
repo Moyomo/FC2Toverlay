@@ -15,10 +15,17 @@ public:
     static int iTargetFPS;
     static std::chrono::microseconds targetFrametime;
     static bool bCreateOverlay;
+    static int iRandomOffsetMin;
+    static int iRandomOffsetMax;
+    static int iOffsetLeft;
+    static int iOffsetTop;
+    static int iOffsetRight;
+    static int iOffsetBottom;
 
     static bool IsConstellationConnected();
     static void GetConfig();
     static void SaveConfig();
+    static void SetRandomDimensions();
 };
 
 #endif

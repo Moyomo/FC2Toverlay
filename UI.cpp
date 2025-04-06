@@ -168,6 +168,7 @@ void UI::RenderSettingsWindow()
     if (Config::bAutostart && UI::SetTargetWindow())
     {
         Config::bCreateOverlay = true;
+        Config::SetRandomDimensions();
         return;
     }
 
@@ -502,10 +503,11 @@ void UI::MoveWindow(const HWND hCurrentProcessWindow)
 
     RECT client;
     GetClientRect(hTargetWindow, &client);
+    MapWindowPoints(hTargetWindow, NULL, (LPPOINT)&client, 2);
     if (!EqualRect(&targetClient, &client))
     {
-        MapWindowPoints(hTargetWindow, NULL, (LPPOINT)&client, 2);
+        targetClient = client;
 
-        SetWindowPos(hCurrentProcessWindow, nullptr, client.left, client.top, client.right - client.left, client.bottom - client.top, SWP_SHOWWINDOW);
+        SetWindowPos(hCurrentProcessWindow, nullptr, client.left + Config::iOffsetLeft, client.top + Config::iOffsetTop, client.right - client.left - Config::iOffsetLeft - Config::iOffsetRight, client.bottom - client.top - Config::iOffsetTop - Config::iOffsetBottom, SWP_SHOWWINDOW);
     }
 }

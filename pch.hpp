@@ -11,6 +11,7 @@
 #include <tchar.h>
 #include <TlHelp32.h>
 #include <chrono>
+#include <random>
 #include "fc2.hpp"
 #include "d3d11.h"
 #include "ImGui/imgui.h"

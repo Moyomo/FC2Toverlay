@@ -8,6 +8,16 @@ int Config::iTargetFPS = 250;
 std::chrono::microseconds Config::targetFrametime{ 4000 };
 bool Config::lastConnectionStatus = false;
 bool Config::bCreateOverlay = false;
+int Config::iRandomOffsetMin = 0;
+int Config::iRandomOffsetMax = 0;
+int Config::iOffsetLeft = 0;
+int Config::iOffsetTop = 0;
+int Config::iOffsetRight = 0;
+int Config::iOffsetBottom = 0;
+
+// random number generator
+static std::random_device rd;
+static std::mt19937 gen(rd());
 
 /**
  * @brief Check if there is an active connection to Constellation
@@ -46,6 +56,8 @@ void Config::GetConfig()
     iTargetFPS = fc2::call<uint32_t>("directx_overlay_target_fps", FC2_LUA_TYPE_INT);
     iTargetFPS = std::min(1000, std::max(iTargetFPS, 0));
     targetFrametime = std::chrono::microseconds(iTargetFPS == 0 ? 1 : 1000000 / iTargetFPS);
+    iRandomOffsetMin = fc2::call<int>("directx_overlay_random_min", FC2_LUA_TYPE_INT);
+    iRandomOffsetMax = fc2::call<int>("directx_overlay_random_max", FC2_LUA_TYPE_INT);
 }
 
 /**
@@ -53,6 +65,25 @@ void Config::GetConfig()
  */
 void Config::SaveConfig()
 {
-    std::string jsonValue = std::format("{{ \"streamproof\": {0:s}, \"target_framerate\": {1:d}, \"autostart\": {2:s}, \"debug_mode\": {3:s} }}", bStreamProof, iTargetFPS, bAutostart, bDebug);
+    std::string jsonValue = std::format("{{ \"streamproof\": {0:s}, \"target_framerate\": {1:d}, \"autostart\": {2:s}, \"debug_mode\": {3:s}, \"random_dimensions_min\": {4:d}, \"random_dimensions_max\": {5:d} }}", bStreamProof, iTargetFPS, bAutostart, bDebug, iRandomOffsetMin, iRandomOffsetMax);
     fc2::call("directx_overlay_save", jsonValue);
+}
+
+/**
+ * @brief Generate random offsets for the overlay size
+ */
+void Config::SetRandomDimensions()
+{
+    // get the range for the random offsets
+    int iRandomMin = std::max(-100, std::min(iRandomOffsetMin, iRandomOffsetMax));
+    int iRandomMax = std::min(100, std::max(iRandomOffsetMin, iRandomOffsetMax));
+
+    // set range for random number generator
+    std::uniform_int_distribution<> distrib(iRandomMin, iRandomMax);
+
+    // generate separate random offsets for each side of the overlay
+    iOffsetLeft = distrib(gen);
+    iOffsetTop = distrib(gen);
+    iOffsetRight = distrib(gen);
+    iOffsetBottom = distrib(gen);
 }

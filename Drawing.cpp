@@ -19,7 +19,7 @@ bool Drawing::IsActive()
  */
 void Drawing::DrawSettings()
 {
-    ImGui::SetNextWindowSize({ 300, 200 }, ImGuiCond_Once);
+    ImGui::SetNextWindowSize({ 200, 200 }, ImGuiCond_Once);
     ImGui::SetNextWindowFocus();
     ImGui::SetNextWindowBgAlpha(1.0f);
     ImGui::Begin("Overlay settings", &bDraw, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -41,16 +41,42 @@ void Drawing::DrawSettings()
         ImGui::Separator();
         if (!constellationConnected) ImGui::BeginDisabled();
 
+        // streamproof setting
         ImGui::Checkbox("Streamproof", &Config::bStreamProof);
 
+        // target FPS setting
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Target FPS");
         ImGui::SameLine();
-        if (ImGui::InputInt(" ", &Config::iTargetFPS, 10, 50, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
+        ImGui::PushItemWidth(100.0f);
+        if (ImGui::InputInt("##Target FPS", &Config::iTargetFPS, 10, 50, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
         {
             Config::iTargetFPS = std::min(1000, std::max(Config::iTargetFPS, 0));
             Config::targetFrametime = std::chrono::microseconds(Config::iTargetFPS == 0 ? 1 : 1000000 / Config::iTargetFPS);
         }
+        ImGui::PopItemWidth();
+
+        // minimum random dimensions offset setting
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Random dimensions min");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(90.0f);
+        if (ImGui::InputInt("##Random dimensions min", &Config::iRandomOffsetMin, 1, 10, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
+        {
+            Config::iRandomOffsetMin = std::min(100, std::max(Config::iRandomOffsetMin, -100));
+        }
+
+        // maximum random dimensions offset setting
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Random dimensions max");
+        ImGui::SameLine();
+        if (ImGui::InputInt("##Random dimensions max", &Config::iRandomOffsetMax, 1, 10, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
+        {
+            Config::iRandomOffsetMax = std::min(100, std::max(Config::iRandomOffsetMax, -100));
+        }
+        ImGui::PopItemWidth();
+
+        // autostart and debug settings
         ImGui::Checkbox("Autostart (skip this window)", &Config::bAutostart);
         if (!constellationConnected) ImGui::EndDisabled();
         ImGui::Checkbox("Debug mode", &Config::bDebug);
@@ -58,7 +84,7 @@ void Drawing::DrawSettings()
         ImGui::Separator();
         if (!constellationConnected) ImGui::BeginDisabled();
 
-        // config buttons
+        // config save and load buttons
         if (ImGui::Button("Save config")) Config::SaveConfig();
         ImGui::SameLine();
         if (ImGui::Button("Load config")) Config::GetConfig();
@@ -70,6 +96,7 @@ void Drawing::DrawSettings()
             if (UI::SetTargetWindow())
             {
                 Config::bCreateOverlay = true;
+                Config::SetRandomDimensions();
                 bDraw = false;
             }
             else
@@ -78,14 +105,14 @@ void Drawing::DrawSettings()
 
         // show error message when overlay creation fails
         if (std::chrono::steady_clock::now() < errorTime)
-            ImGui::TextColored({ 0.9, 0.1, 0.0, 1.0 }, "Can't find the target window! Make sure\nConstellation is fully calibrated\nand try again.");
+            ImGui::TextColored({ 0.9f, 0.1f, 0.0f, 1.0f }, "Can't find the target window! Make sure\nConstellation is fully calibrated and\ntry again.");
         if (!constellationConnected) ImGui::EndDisabled();
 
         // debug info
         if (Config::bDebug)
         {
             ImGui::Separator();
-            ImGui::TextColored({ 0.2, 0.4, 1.0, 1.0 }, "Debug Info");
+            ImGui::TextColored({ 0.2f, 0.4f, 1.0f, 1.0f }, "Debug Info");
             ImGui::Text("Overlay version: 1.2.2"); // yes, this is stupid
             auto fc2tVersion = fc2::get_version();
             ImGui::Text("Used FC2T version: %i.%i", fc2tVersion.first, fc2tVersion.second);
@@ -113,53 +140,59 @@ void Drawing::Draw()
         // get the default font
         ImFont* font = ImGui::GetIO().Fonts->Fonts[0];
 
+        // get drawing canvas to draw in the background
+        const auto canvas = ImGui::GetBackgroundDrawList();
+
         // loop over the drawing requests
-        for (auto& i : drawing)
+        for (auto& [text, dimensions, style] : drawing)
         {
-            // get drawing canvas to draw in the background
-            auto canvas = ImGui::GetBackgroundDrawList();
+            // subtract random offsets from the drawing positions
+            dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT] -= Config::iOffsetLeft;
+            dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_RIGHT] -= Config::iOffsetLeft;
+            dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP] -= Config::iOffsetTop;
+            dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_BOTTOM] -= Config::iOffsetTop;
 
             // draw a drop shadow for the text and then the text itself on top of it
-            if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_TEXT)
+            if (style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_TEXT)
             {
                 canvas->AddText(
                     font,
                     13.0f,
-                    ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT] + 1, i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP] + 1),
-                    ImColor(0, 0, 0, static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA])),
-                    i.text
+                    ImVec2(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT] + 1.0f, dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP] + 1.0f),
+                    ImColor(0, 0, 0, style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]),
+                    text
                 );
 
                 canvas->AddText(
                     font,
                     13.0f,
-                    ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]),
-                    ImColor(static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA])),
-                    i.text
+                    ImVec2(static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT]), static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP])),
+                    ImColor(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]),
+                    text
                 );
             }
 
             // draw a line
-            else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_LINE)
+            else if (style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_LINE)
             {
                 canvas->AddLine(
-                    ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]),
-                    ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_RIGHT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_BOTTOM]),
-                    ImColor((int)i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED], i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN], i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE], i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]),
-                    i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]
+                    ImVec2(static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT]), static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP])),
+                    ImVec2(static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_RIGHT]), static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_BOTTOM])),
+                    ImColor(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]),
+                    static_cast<float>(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS])
                 );
             }
 
             // draw normal or filled boxes
-            else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX || i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX_FILLED)
+            else if (style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX || style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX_FILLED)
             {
-                const auto min = ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]);
-                const auto max = ImVec2(min.x + i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_RIGHT], min.y + i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_BOTTOM]);
-                const auto clr = ImColor(static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]));
+                const auto min = ImVec2(static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT]), static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]));
+                const auto max = ImVec2(min.x + dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_RIGHT] + Config::iOffsetLeft, min.y + dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_BOTTOM] + Config::iOffsetTop);
+                const auto clr = ImColor(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]);
 
-                if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX)
+                if (style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_BOX)
                 {
-                    canvas->AddRect(min, max, clr, NULL, NULL, static_cast<float>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]));
+                    canvas->AddRect(min, max, clr, NULL, NULL, static_cast<float>(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]));
                 }
                 else
                 {
@@ -168,18 +201,18 @@ void Drawing::Draw()
             }
 
             // draw normal or filled circles
-            else if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE || i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE_FILLED)
+            else if (style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE || style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE_FILLED)
             {
-                const auto pos = ImVec2(i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT], i.dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]);
-                const auto clr = ImColor(static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE]), static_cast<int>(i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]));
+                const auto pos = ImVec2(static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_LEFT]), static_cast<float>(dimensions[FC2_TEAM_DRAW_DIMENSIONS::FC2_TEAM_DRAW_DIMENSIONS_TOP]));
+                const auto clr = ImColor(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_RED], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_GREEN], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_BLUE], style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_ALPHA]);
 
-                if (i.style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE)
+                if (style[FC2_TEAM_DRAW_STYLE_TYPE] == FC2_TEAM_DRAW_TYPE_CIRCLE)
                 {
-                    canvas->AddCircle(pos, i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS], clr);
+                    canvas->AddCircle(pos, style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS], clr);
                 }
                 else
                 {
-                    canvas->AddCircleFilled(pos, i.style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS], clr);
+                    canvas->AddCircleFilled(pos, static_cast<float>(style[FC2_TEAM_DRAW_STYLE::FC2_TEAM_DRAW_STYLE_THICKNESS]), clr);
                 }
             }
         }
@@ -187,19 +220,26 @@ void Drawing::Draw()
 
     if (Config::bDebug)
     {
-        // draw red rectangle around target window client
+        // draw red rectangle around overlay window client
         ImVec2 displaySize = ImGui::GetIO().DisplaySize;
         auto canvas = ImGui::GetBackgroundDrawList();
-        canvas->AddRect(ImVec2(0, 0), displaySize, ImColor(255, 0, 0, 255));
+        canvas->AddRect(ImVec2(0.0f, 0.0f), displaySize, ImColor(255, 0, 0, 180));
+
+        // draw blue rectangle around target window client (if border is visible)
+        canvas->AddRect(ImVec2(0.0f - Config::iOffsetLeft, 0.0f - Config::iOffsetTop), ImVec2(displaySize.x + Config::iOffsetRight, displaySize.y + Config::iOffsetBottom), ImColor(0, 0, 255, 180));
 
         // draw window with info about overlay performance
-        ImGui::SetNextWindowSize({ 300, 85 }, ImGuiCond_Once);
-        ImGui::SetNextWindowBgAlpha(0.7f);
-        ImGui::Begin("Overlay Performance", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+        ImGui::SetNextWindowSize({ 300.0f, 85.0f }, ImGuiCond_Once);
+        ImGui::SetNextWindowPos({ 60.0f - Config::iOffsetLeft, 60.0f - Config::iOffsetTop }, ImGuiCond_Once);
+        ImGui::SetNextWindowBgAlpha(0.6f);
+        ImGui::Begin("Overlay debug window", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
         {
-            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::Text("Frames per second: %.1f", ImGui::GetIO().Framerate);
             ImGui::Text("Frametime: %.3f ms/frame", 1000.0f / ImGui::GetIO().Framerate);
-            ImGui::Text("Display size - X: %.0f Y: %.0f", displaySize.x, displaySize.y);
+            ImGui::Text("Overlay size - X: %.0f Y: %.0f", displaySize.x, displaySize.y);
+            ImGui::Text("Target window size - X: %.0f Y: %.0f", displaySize.x + Config::iOffsetLeft + Config::iOffsetRight, displaySize.y + Config::iOffsetTop + Config::iOffsetBottom);
+            ImGui::Text("Offset Left: %d Offset Top: %d", Config::iOffsetLeft, Config::iOffsetTop);
+            ImGui::Text("Offset Right: %d Offset Bottom: %d", Config::iOffsetRight, Config::iOffsetBottom);
         }
         ImGui::End();
     }
