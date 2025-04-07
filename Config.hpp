@@ -3,6 +3,8 @@
 
 #include "pch.hpp"
 
+extern ImGuiKey ImGui_ImplWin32_KeyEventToImGuiKey(WPARAM wParam, LPARAM lParam);
+
 class Config
 {
 private:
@@ -21,11 +23,13 @@ public:
     static int iOffsetTop;
     static int iOffsetRight;
     static int iOffsetBottom;
+    static int iQuitKeycode;
 
     static bool IsConstellationConnected();
     static void GetConfig();
     static void SaveConfig();
     static void SetRandomDimensions();
+    static int ImGuiKeyToVirtualKeycode(ImGuiKey key);
 };
 
 #endif

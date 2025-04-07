@@ -7,12 +7,15 @@ class Drawing
 {
 private:
     static std::chrono::steady_clock::time_point errorTime;
-    static bool bDraw;
+    static bool bDrawSettings;
+    static ImGuiID lastKeyLabelID;
 
 public:
-    static bool IsActive();
+    static ImGuiKey quitKey;
+    static bool IsSettingsWindowActive();
     static void DrawSettings();
-    static void Draw();
+    static void DrawOverlay();
+    static bool Hotkey(const char* label, ImGuiKey& key);
 };
 
 #endif

@@ -221,10 +221,6 @@ void UI::RenderSettingsWindow()
                 bDone = true;
         }
 
-        // check if the user pressed the exit key
-        if (LI_FN(GetAsyncKeyState).in_cached(LI_MODULE("User32.dll").cached())(VK_END) & 1)
-            bDone = true;
-
         if (bDone)
             break;
 
@@ -252,7 +248,7 @@ void UI::RenderSettingsWindow()
         pSwapChain->Present(1, 0);
 
         // check if the settings window was closed
-        if (!Drawing::IsActive())
+        if (!Drawing::IsSettingsWindowActive())
             break;
     }
 
@@ -348,10 +344,6 @@ void UI::RenderOverlay()
                 bDone = true;
         }
 
-        // check if the user pressed the exit key
-        if (LI_FN(GetAsyncKeyState).in_cached(LI_MODULE("User32.dll").cached())(VK_END) & 1)
-            bDone = true;
-
         // check for the last FC2 error message
         if (fc2::get_error() != FC2_TEAM_ERROR_NO_ERROR)
             bDone = true;
@@ -375,12 +367,16 @@ void UI::RenderOverlay()
             continue;
         }
 
+        // check if the user pressed the exit key
+        if (LI_FN(GetAsyncKeyState).in_cached(LI_MODULE("User32.dll").cached())(Config::iQuitKeycode) & 1)
+            break;
+
         // create new frame and get drawing requests
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         {
-            Drawing::Draw();
+            Drawing::DrawOverlay();
         }
         ImGui::EndFrame();
 

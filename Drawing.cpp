@@ -4,14 +4,16 @@
 
 // define default values
 std::chrono::steady_clock::time_point Drawing::errorTime = std::chrono::steady_clock::time_point();
-bool Drawing::bDraw = true;
+bool Drawing::bDrawSettings = true;
+ImGuiID Drawing::lastKeyLabelID = 0;
+ImGuiKey Drawing::quitKey = ImGui_ImplWin32_KeyEventToImGuiKey(Config::iQuitKeycode, 0);
 
 /**
- * @brief Check if window should get closed
+ * @brief Check if settings window should get closed
  */
-bool Drawing::IsActive()
+bool Drawing::IsSettingsWindowActive()
 {
-    return bDraw == true;
+    return bDrawSettings == true;
 }
 
 /**
@@ -19,10 +21,10 @@ bool Drawing::IsActive()
  */
 void Drawing::DrawSettings()
 {
-    ImGui::SetNextWindowSize({ 200, 200 }, ImGuiCond_Once);
+    ImGui::SetNextWindowSize({ 200.0f, 200.0f }, ImGuiCond_Once);
     ImGui::SetNextWindowFocus();
     ImGui::SetNextWindowBgAlpha(1.0f);
-    ImGui::Begin("Overlay settings", &bDraw, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin("Overlay settings", &bDrawSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
     {
         // show Constellation connection status
         bool constellationConnected = Config::IsConstellationConnected();
@@ -76,6 +78,16 @@ void Drawing::DrawSettings()
         }
         ImGui::PopItemWidth();
 
+        // custom quit hotkey
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Quit hotkey");
+        ImGui::SameLine();
+        if (Drawing::Hotkey("Quit hotkey", quitKey))
+        {
+            // translate the ImGuiKey to the matching virtual keycode and save it to the config
+            Config::iQuitKeycode = Config::ImGuiKeyToVirtualKeycode(quitKey);
+        }
+
         // autostart and debug settings
         ImGui::Checkbox("Autostart (skip this window)", &Config::bAutostart);
         if (!constellationConnected) ImGui::EndDisabled();
@@ -97,7 +109,7 @@ void Drawing::DrawSettings()
             {
                 Config::bCreateOverlay = true;
                 Config::SetRandomDimensions();
-                bDraw = false;
+                bDrawSettings = false;
             }
             else
                 errorTime = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -122,6 +134,7 @@ void Drawing::DrawSettings()
             ImGui::Text("Target process ID: %d", (uint32_t)UI::dTargetPID);
             auto frametime = Config::targetFrametime.count();
             ImGui::Text("Overlay target frametime:\n%llu microseconds", frametime);
+            ImGui::Text("Custom quit keycode: %d", Config::iQuitKeycode);
         }
     }
     ImGui::End();
@@ -130,7 +143,7 @@ void Drawing::DrawSettings()
 /**
  * @brief Draw the overlay content
  */
-void Drawing::Draw()
+void Drawing::DrawOverlay()
 {
     if (fc2::get_error() == FC2_TEAM_ERROR_NO_ERROR)
     {
@@ -243,4 +256,66 @@ void Drawing::Draw()
         }
         ImGui::End();
     }
+}
+
+/**
+ * @brief Button that lets you select a hotkey by pressing it
+ * @param label Unique identifier of the button
+ * @param selectedKey Variable that will contain the selected key
+ * @return true if the hotkey was changed, otherwise false
+ */
+bool Drawing::Hotkey(const char* label, ImGuiKey& selectedKey)
+{
+    // get label id
+    const ImGuiID labelID = ImGui::GetID(label);
+
+    // check if button is currently waiting for user input
+    bool canSetKey = lastKeyLabelID == labelID;
+
+    // define text shown on the button
+    std::string_view buttonText = canSetKey ? "..." : ImGui::IsNamedKey(selectedKey) ? ImGui::GetKeyName(selectedKey) : "Unknown";
+
+    // calculate width of the button
+    ImVec2 textSize = ImGui::CalcTextSize(buttonText.data());
+    textSize.x += 10.0f;
+    if (textSize.x < 50.0f) textSize.x = 50.0f;
+
+    // Define button and click event
+    ImGui::PushID(labelID);
+    if (ImGui::Button(buttonText.data(), { textSize.x, 19.0f }))
+    {
+        canSetKey = true;
+        lastKeyLabelID = labelID;
+    }
+    ImGui::PopID();
+
+    if (!canSetKey)
+        return false;
+
+    // check if the user clicked somewhere else
+    if (!ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[0])
+    {
+        lastKeyLabelID = 0;
+        return false;
+    }
+
+    // loop over all possible ImGuiKeys
+    for (ImGuiKey key = ImGuiKey_NamedKey_BEGIN; key < ImGuiKey_COUNT; key = (ImGuiKey)(key + 1))
+    {
+        // check if current key is being pressed
+        if (!ImGui::IsKeyDown(key))
+            continue;
+
+        // check if the keycode is valid and not a mouse click
+        if (Config::ImGuiKeyToVirtualKeycode(key) < 3)
+            continue;
+
+        // save the new key
+        selectedKey = key;
+
+        lastKeyLabelID = 0;
+        break;
+    }
+
+    return lastKeyLabelID == 0;
 }
