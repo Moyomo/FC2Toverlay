@@ -50,13 +50,12 @@ void Drawing::DrawSettings()
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Target FPS");
         ImGui::SameLine();
-        ImGui::PushItemWidth(100.0f);
+        ImGui::SetNextItemWidth(100.0f);
         if (ImGui::InputInt("##Target FPS", &Config::iTargetFPS, 10, 50, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
         {
             Config::iTargetFPS = std::min(1000, std::max(Config::iTargetFPS, 0));
             Config::targetFrametime = std::chrono::microseconds(Config::iTargetFPS == 0 ? 1 : 1000000 / Config::iTargetFPS);
         }
-        ImGui::PopItemWidth();
 
         // minimum random dimensions offset setting
         ImGui::AlignTextToFramePadding();
@@ -82,14 +81,13 @@ void Drawing::DrawSettings()
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Window name");
         ImGui::SameLine();
-        ImGui::PushItemWidth(160.0f);
+        ImGui::SetNextItemWidth(160.0f);
         if (ImGui::InputText("##Window name", &Config::sWindowName, ImGuiInputTextFlags_CallbackCharFilter, Drawing::FilterChars))
         {
             // resize string if it's longer than 64 characters
             if (Config::sWindowName.length() > 64)
                 Config::sWindowName.resize(64);
         }
-        ImGui::PopItemWidth();
 
         // custom quit hotkey
         ImGui::AlignTextToFramePadding();
@@ -169,6 +167,10 @@ void Drawing::DrawOverlay()
         // get drawing canvas to draw in the background
         const auto canvas = ImGui::GetBackgroundDrawList();
 
+        // clip the drawing area to prevent drawing outside of the target window area
+        ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+        canvas->PushClipRect({ 0.0f - Config::iOffsetLeft, 0.0f - Config::iOffsetTop }, { displaySize.x + Config::iOffsetRight, displaySize.y + Config::iOffsetBottom });
+
         // loop over the drawing requests
         for (auto& [text, dimensions, style] : drawing)
         {
@@ -242,6 +244,9 @@ void Drawing::DrawOverlay()
                 }
             }
         }
+
+        // remove the drawing area restriction
+        canvas->PopClipRect();
     }
 
     if (Config::bDebug)
