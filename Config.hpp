@@ -23,6 +23,7 @@ public:
     static int iOffsetTop;
     static int iOffsetRight;
     static int iOffsetBottom;
+    static std::string sWindowName;
     static int iQuitKeycode;
 
     static bool IsConstellationConnected();

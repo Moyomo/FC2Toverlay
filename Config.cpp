@@ -15,6 +15,7 @@ int Config::iOffsetLeft = 0;
 int Config::iOffsetTop = 0;
 int Config::iOffsetRight = 0;
 int Config::iOffsetBottom = 0;
+std::string Config::sWindowName = "FC2Toverlay";
 int Config::iQuitKeycode = VK_END;
 
 // random number generator
@@ -60,6 +61,7 @@ void Config::GetConfig()
     targetFrametime = std::chrono::microseconds(iTargetFPS == 0 ? 1 : 1000000 / iTargetFPS);
     iRandomOffsetMin = fc2::call<int>("directx_overlay_random_min", FC2_LUA_TYPE_INT);
     iRandomOffsetMax = fc2::call<int>("directx_overlay_random_max", FC2_LUA_TYPE_INT);
+    sWindowName = fc2::call<std::string>("directx_overlay_window_name", FC2_LUA_TYPE_STRING);
     iQuitKeycode = fc2::call<int>("directx_overlay_quit_key", FC2_LUA_TYPE_INT);
 
     // set button text for custom key
@@ -71,7 +73,7 @@ void Config::GetConfig()
  */
 void Config::SaveConfig()
 {
-    std::string jsonValue = std::format("{{ \"streamproof\": {0:s}, \"target_framerate\": {1:d}, \"autostart\": {2:s}, \"debug_mode\": {3:s}, \"random_dimensions_min\": {4:d}, \"random_dimensions_max\": {5:d}, \"quit_key\": {6:d} }}", bStreamProof, iTargetFPS, bAutostart, bDebug, iRandomOffsetMin, iRandomOffsetMax, iQuitKeycode);
+    std::string jsonValue = std::format("{{ \"streamproof\": {0:s}, \"target_framerate\": {1:d}, \"autostart\": {2:s}, \"debug_mode\": {3:s}, \"random_dimensions_min\": {4:d}, \"random_dimensions_max\": {5:d}, \"window_name\": \"{6:s}\", \"quit_key\": {7:d} }}", bStreamProof, iTargetFPS, bAutostart, bDebug, iRandomOffsetMin, iRandomOffsetMax, sWindowName, iQuitKeycode);
     fc2::call("directx_overlay_save", jsonValue);
 }
 

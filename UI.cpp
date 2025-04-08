@@ -271,8 +271,12 @@ void UI::RenderSettingsWindow()
  */
 void UI::RenderOverlay()
 {
+    // prepare custom overlay window name
+    if (Config::sWindowName.length() == 0) Config::sWindowName = "FC2Toverlay";
+    std::wstring windowName = std::wstring(Config::sWindowName.begin(), Config::sWindowName.end());
+
     // create window class for the overlay
-    const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, _T("FC2Toverlay"), nullptr };
+    const WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, windowName.c_str(), nullptr };
     ::RegisterClassEx(&wc);
 
     // create window in highest z-order possible
@@ -285,7 +289,7 @@ void UI::RenderOverlay()
 #endif // _DEBUG
 
     // create overlay window
-    const HWND hwnd = LI_FN_DEF(CreateWindowInBand).in(LI_MODULE("User32.dll").cached())(UI::dwWindowStyles, wc.lpszClassName, _T("FC2Toverlay"), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
+    const HWND hwnd = LI_FN_DEF(CreateWindowInBand).in(LI_MODULE("User32.dll").cached())(UI::dwWindowStyles, wc.lpszClassName, windowName.c_str(), WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr, wc.hInstance, nullptr, band);
 
     // set display affinity to hide the window in screen captures
     if (Config::bStreamProof)

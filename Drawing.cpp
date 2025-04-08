@@ -78,6 +78,19 @@ void Drawing::DrawSettings()
         }
         ImGui::PopItemWidth();
 
+        // custom overlay window name
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Window name");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(160.0f);
+        if (ImGui::InputText("##Window name", &Config::sWindowName, ImGuiInputTextFlags_CallbackCharFilter, Drawing::FilterChars))
+        {
+            // resize string if it's longer than 64 characters
+            if (Config::sWindowName.length() > 64)
+                Config::sWindowName.resize(64);
+        }
+        ImGui::PopItemWidth();
+
         // custom quit hotkey
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Quit hotkey");
@@ -256,6 +269,32 @@ void Drawing::DrawOverlay()
         }
         ImGui::End();
     }
+}
+
+/**
+ * @brief Filter input characters with specified rules
+ * @param data ImGui callback data for the input text
+ * @return 0 if the character is valid, otherwise 1
+ */
+int Drawing::FilterChars(ImGuiInputTextCallbackData* data)
+{
+    // check if character is a lowercase letter
+    if (data->EventChar >= 0x61 && data->EventChar <= 0x7A)
+        return 0;
+
+    // check if character is an uppercase letter
+    if (data->EventChar >= 0x41 && data->EventChar <= 0x5A)
+        return 0;
+
+    // check if character is a number
+    if (data->EventChar >= 0x30 && data->EventChar <= 0x39)
+        return 0;
+
+    // check if character is a space
+    if (data->EventChar == 0x20)
+        return 0;
+
+    return 1;
 }
 
 /**

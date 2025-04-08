@@ -15,6 +15,7 @@ public:
     static bool IsSettingsWindowActive();
     static void DrawSettings();
     static void DrawOverlay();
+    static int FilterChars(ImGuiInputTextCallbackData* data);
     static bool Hotkey(const char* label, ImGuiKey& key);
 };
 
