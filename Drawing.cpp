@@ -21,7 +21,7 @@ bool Drawing::IsSettingsWindowActive()
  */
 void Drawing::DrawSettings()
 {
-    ImGui::SetNextWindowSize({ 200.0f, 200.0f }, ImGuiCond_Once);
+    ImGui::SetNextWindowSize({ 240.0f, 200.0f }, ImGuiCond_Once);
     ImGui::SetNextWindowFocus();
     ImGui::SetNextWindowBgAlpha(1.0f);
     ImGui::Begin("Overlay settings", &bDrawSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -36,7 +36,7 @@ void Drawing::DrawSettings()
         else
         {
             ImGui::TextColored({ 0.9f, 0.1f, 0.0f, 1.0f }, "Not connected");
-            ImGui::Text("Launch Constellation and restart the overlay");
+            ImGui::Text("Launch Constellation and restart\nthe overlay");
         }
 
         // draw overlay config options
@@ -44,13 +44,16 @@ void Drawing::DrawSettings()
         if (!constellationConnected) ImGui::BeginDisabled();
 
         // streamproof setting
-        ImGui::Checkbox("Streamproof", &Config::bStreamProof);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Streamproof");
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 19.0f);
+        ImGui::Checkbox("##Streamproof", &Config::bStreamProof);
 
         // target FPS setting
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Target FPS");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(100.0f);
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 90.0f);
+        ImGui::PushItemWidth(90.0f);
         if (ImGui::InputInt("##Target FPS", &Config::iTargetFPS, 10, 50, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
         {
             Config::iTargetFPS = std::min(1000, std::max(Config::iTargetFPS, 0));
@@ -59,9 +62,8 @@ void Drawing::DrawSettings()
 
         // minimum random dimensions offset setting
         ImGui::AlignTextToFramePadding();
-        ImGui::Text("Random dimensions min");
-        ImGui::SameLine();
-        ImGui::PushItemWidth(90.0f);
+        ImGui::Text("Size offset min");
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 90.0f);
         if (ImGui::InputInt("##Random dimensions min", &Config::iRandomOffsetMin, 1, 10, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
         {
             Config::iRandomOffsetMin = std::min(100, std::max(Config::iRandomOffsetMin, -100));
@@ -69,8 +71,8 @@ void Drawing::DrawSettings()
 
         // maximum random dimensions offset setting
         ImGui::AlignTextToFramePadding();
-        ImGui::Text("Random dimensions max");
-        ImGui::SameLine();
+        ImGui::Text("Size offset max");
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 90.0f);
         if (ImGui::InputInt("##Random dimensions max", &Config::iRandomOffsetMax, 1, 10, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
         {
             Config::iRandomOffsetMax = std::min(100, std::max(Config::iRandomOffsetMax, -100));
@@ -80,8 +82,8 @@ void Drawing::DrawSettings()
         // custom overlay window name
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Window name");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(160.0f);
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 110.0f);
+        ImGui::SetNextItemWidth(110.0f);
         if (ImGui::InputText("##Window name", &Config::sWindowName, ImGuiInputTextFlags_CallbackCharFilter, Drawing::FilterChars))
         {
             // resize string if it's longer than 64 characters
@@ -92,28 +94,37 @@ void Drawing::DrawSettings()
         // custom quit hotkey
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Quit hotkey");
-        ImGui::SameLine();
         if (Drawing::Hotkey("Quit hotkey", quitKey))
         {
             // translate the ImGuiKey to the matching virtual keycode and save it to the config
             Config::iQuitKeycode = Config::ImGuiKeyToVirtualKeycode(quitKey);
         }
 
-        // autostart and debug settings
-        ImGui::Checkbox("Autostart (skip this window)", &Config::bAutostart);
+        // autostart setting
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Autostart");
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 19.0f);
+        ImGui::Checkbox("##Autostart", &Config::bAutostart);
+
+        // debug setting
         if (!constellationConnected) ImGui::EndDisabled();
-        ImGui::Checkbox("Debug mode", &Config::bDebug);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Debug mode");
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 19.0f);
+        ImGui::Checkbox("##Debug mode", &Config::bDebug);
 
         ImGui::Separator();
         if (!constellationConnected) ImGui::BeginDisabled();
 
         // config save and load buttons
+        ImGui::Dummy({ 0.0f, 0.0f });
         if (ImGui::Button("Save config")) Config::SaveConfig();
         ImGui::SameLine();
         if (ImGui::Button("Load config")) Config::GetConfig();
 
         // button to start the overlay
-        ImGui::Dummy({ 0.0f, 1.0f });
+        ImGui::Dummy({ 0.0f, 0.0f });
+        ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.21f, 0.47f, 1.0f });
         if (ImGui::Button("Start overlay"))
         {
             if (UI::SetTargetWindow())
@@ -125,15 +136,20 @@ void Drawing::DrawSettings()
             else
                 errorTime = std::chrono::steady_clock::now() + std::chrono::seconds(5);
         }
+        ImGui::PopStyleColor();
 
         // show error message when overlay creation fails
         if (std::chrono::steady_clock::now() < errorTime)
-            ImGui::TextColored({ 0.9f, 0.1f, 0.0f, 1.0f }, "Can't find the target window! Make sure\nConstellation is fully calibrated and\ntry again.");
+        {
+            ImGui::Dummy({ 0.0f, 0.0f });
+            ImGui::TextColored({ 0.9f, 0.1f, 0.0f, 1.0f }, "Can't find the target window!\nMake sure Constellation is\nfully calibrated and try again.");
+        }
         if (!constellationConnected) ImGui::EndDisabled();
 
         // debug info
         if (Config::bDebug)
         {
+            ImGui::Dummy({ 0.0f, 0.0f });
             ImGui::Separator();
             ImGui::TextColored({ 0.2f, 0.4f, 1.0f, 1.0f }, "Debug Info");
             ImGui::Text("Overlay version: 1.3"); // yes, this is stupid
@@ -144,7 +160,7 @@ void Drawing::DrawSettings()
             ImGui::Text("Target handle: %d", (uint32_t)UI::hTargetWindow);
             ImGui::Text("Target process ID: %d", (uint32_t)UI::dTargetPID);
             auto frametime = Config::targetFrametime.count();
-            ImGui::Text("Overlay target frametime:\n%llu microseconds", frametime);
+            ImGui::Text("Overlay target frametime:\n%llu microsecond%s", frametime, frametime == 1 ? "" : "s");
             ImGui::Text("Custom quit keycode: %d", Config::iQuitKeycode);
         }
     }
@@ -326,6 +342,7 @@ bool Drawing::Hotkey(const char* label, ImGuiKey& selectedKey)
 
     // Define button and click event
     ImGui::PushID(labelID);
+    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - textSize.x);
     if (ImGui::Button(buttonText.data(), { textSize.x, 19.0f }))
     {
         canSetKey = true;
