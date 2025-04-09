@@ -16,6 +16,7 @@ public:
     static void DrawSettings();
     static void DrawOverlay();
     static int FilterChars(ImGuiInputTextCallbackData* data);
+    static void HelpMarker(const char* desc);
     static bool Hotkey(const char* label, ImGuiKey& key);
 };
 

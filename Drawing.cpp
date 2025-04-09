@@ -46,12 +46,16 @@ void Drawing::DrawSettings()
         // streamproof setting
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Streamproof");
+        ImGui::SameLine();
+        HelpMarker("Don't show the overlay in all kinds of screen recordings (screenshots/streams/video capture)");
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 19.0f);
         ImGui::Checkbox("##Streamproof", &Config::bStreamProof);
 
         // target FPS setting
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Target FPS");
+        ImGui::SameLine();
+        HelpMarker("The amount of frames per second the overlay tries to run at");
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 90.0f);
         ImGui::PushItemWidth(90.0f);
         if (ImGui::InputInt("##Target FPS", &Config::iTargetFPS, 10, 50, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
@@ -63,6 +67,8 @@ void Drawing::DrawSettings()
         // minimum random dimensions offset setting
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Size offset min");
+        ImGui::SameLine();
+        HelpMarker("The minimum value for the random size difference between the overlay and the target window. A negative offset will make the overlay larger than the target window");
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 90.0f);
         if (ImGui::InputInt("##Random dimensions min", &Config::iRandomOffsetMin, 1, 10, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
         {
@@ -72,6 +78,8 @@ void Drawing::DrawSettings()
         // maximum random dimensions offset setting
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Size offset max");
+        ImGui::SameLine();
+        HelpMarker("The maximum value for the random size difference between the overlay and the target window. A negative offset will make the overlay larger than the target window");
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 90.0f);
         if (ImGui::InputInt("##Random dimensions max", &Config::iRandomOffsetMax, 1, 10, ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_ParseEmptyRefVal))
         {
@@ -82,6 +90,8 @@ void Drawing::DrawSettings()
         // custom overlay window name
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Window name");
+        ImGui::SameLine();
+        HelpMarker("Custom name for the overlay window and overlay window class");
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 110.0f);
         ImGui::SetNextItemWidth(110.0f);
         if (ImGui::InputText("##Window name", &Config::sWindowName, ImGuiInputTextFlags_CallbackCharFilter, Drawing::FilterChars))
@@ -94,6 +104,8 @@ void Drawing::DrawSettings()
         // custom quit hotkey
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Quit hotkey");
+        ImGui::SameLine();
+        HelpMarker("Custom hotkey for quickly closing the overlay (panic button)");
         if (Drawing::Hotkey("Quit hotkey", quitKey))
         {
             // translate the ImGuiKey to the matching virtual keycode and save it to the config
@@ -103,6 +115,8 @@ void Drawing::DrawSettings()
         // autostart setting
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Autostart");
+        ImGui::SameLine();
+        HelpMarker("Skip this settings window in the future and directly launch the overlay with the saved config settings");
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 19.0f);
         ImGui::Checkbox("##Autostart", &Config::bAutostart);
 
@@ -110,6 +124,8 @@ void Drawing::DrawSettings()
         if (!constellationConnected) ImGui::EndDisabled();
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Debug mode");
+        ImGui::SameLine();
+        HelpMarker("Display additional information for debugging and troubleshooting in the settings window and on the overlay");
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 19.0f);
         ImGui::Checkbox("##Debug mode", &Config::bDebug);
 
@@ -316,6 +332,23 @@ int Drawing::FilterChars(ImGuiInputTextCallbackData* data)
         return 0;
 
     return 1;
+}
+
+/**
+ * @brief Draw question mark symbol that displays a help text when hovered
+ * @param desc The description text that the help marker displays
+ */
+void Drawing::HelpMarker(const char* desc)
+{
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 5.0f);
+    ImGui::TextDisabled("(?)");
+    if (ImGui::BeginItemTooltip())
+    {
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(desc);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
 }
 
 /**
